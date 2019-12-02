@@ -54,12 +54,11 @@ Keypad_I2C kpd( makeKeymap(keys), rowPins, colPins, ROWS, COLS, I2CADDR, 1 );
 void info()
 {if(staty == 1)
  {
-   
-   //test
-  
+   //#todo
  }
 
 }
+
 void setup()
 {
   Wire.begin( );                              // Wyświetlanie komunikatu na LCD przy zakończeniu kompilacji.
@@ -146,7 +145,7 @@ void Awaits()
 }
 
 void sendToServer(String command)         // Komuniacja z serverem przez WiFi.
-{ 
+{  //$todo dodać wysyłanie stanu drzwi i stanu czujników
   // wait for WiFi connection
   if ((WiFiMulti.run() == WL_CONNECTED)) {
 
@@ -216,6 +215,7 @@ void stan_drzwi(int stan)                              // Funkcja zawierająca s
 
 void procedura_otwarcia()
 {
+  // DZIAŁA SŁABO
   int j = 0;
   stan_drzwi(OPEN);
   for (j = 0; j < 5; j++)
@@ -242,22 +242,10 @@ void procedura_otwarcia()
     i = 0;
   }
 }
-void silnik(int s)
-{for(int d=0; d++;d<10)
+
+void sterowanie_silnik()
 {
- expander_1.digitalWrite(7, HIGH);
- delay(s);
- expander_1.digitalWrite(7, LOW);
- expander_1.digitalWrite(5, HIGH);
- delay(s);
- expander_1.digitalWrite(5, LOW);
- expander_1.digitalWrite(6, HIGH);
- delay(s);
- expander_1.digitalWrite(6, LOW);
- expander_1.digitalWrite(4, HIGH);
- delay(s);
- expander_1.digitalWrite(4, LOW);
-}
+// #todo
 }
 void kod_dostepu()
 {
@@ -348,11 +336,9 @@ void loop()
     content.toUpperCase();
     Serial.println();
   //Koniec Modułu
-  // Wysyłanie maila
-    
-  // Koniec wysyłania maila
 
   info();
+  
   if (content.substring(1) == "7B 71 17 21") // UID, które może otworzyć zamek.
   { sendToServer("opened");
     stan_drzwi(OPEN);
