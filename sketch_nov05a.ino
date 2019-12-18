@@ -70,7 +70,7 @@ TimeoutData* find_timeout(const char *name) {
 bool LockCloseRequested = false;
 bool LockCloseCompleted = false;
 
-bool LockClearRequested = false;
+bool DisplayClearRequested = false;
 
 bool AlarmRaiseRequested = false;
 bool AlarmRunning = false;
@@ -83,14 +83,21 @@ bool AlarmRunning = false;
 LockState lockState = LockState::Closed;
 
 /*
-*   Inicjalizacja ekspander_1, na adresie 0x20
+ *   Inicjalizacja ekspander_1, na adresie EXPANDER_1
+ * Obsługuje:
+ * Lock (zamek)
+ * Diodę RGB
 */
-PCF8574 expander_1(EXPANDER_1);
+PCF8574 expander_1(EXPANDER_1_ADDR);
+PCF8574 expander_2(EXPANDER_2_ADDR);
+
+
+
 /*
-*   Inicjalizacja wyświetlacza lcd, na adresie 0x27
-*   z 16 znakami na 2 rzędach
+*   Inicjalizacja wyświetlacza lcd, na adresie LIQUID_CRYSTAL_I2C_ADD
+*   z DISPLAY_LENGTH znakami na 2 rzędach
 */
-LiquidCrystal_I2C lcd(LIQUID_CRYSTAL_I2C_ADD, 16, 2);
+LiquidCrystal_I2C lcd(LIQUID_CRYSTAL_I2C_ADDR, DISPLAY_LENGTH, DISPLAY_WIDTH);
 
 
 // Wifi
@@ -147,9 +154,11 @@ void setup()
   pinMode(CZUJNIK_DRZWI_PIN, INPUT_PULLUP); // Deklaracja czujnika jako wejścia, i wewnętrzne podciągnięcie go
 
   expander_1.pinMode(ZAMEK_PIN, OUTPUT);      // Deklaracja zamka przez ekspander jako wyjścia.
-    expander_1.pinMode(3, OUTPUT);      // Deklaracja zamka przez ekspander jako wyjścia.
-    expander_1.pinMode(4, OUTPUT);      // Deklaracja zamka przez ekspander jako wyjścia.
+  expander_1.pinMode(RGB_RED_PIN, OUTPUT);
+  expander_1.pinMode(RGB_BLUE_PIN, OUTPUT);
+  expander_1.pinMode(RGB_GREEN_PIN, OUTPUT);
   expander_1.pinMode(ALARM_PIN, OUTPUT);      // Deklaracja alarmu przez ekspander jako wyjścia.
+  expander_1.pinMode(BUZZER_PIN, OUTPUT);
 
    // Inicjalizacja keypada, z wcześniej ustawionym mapowaniem klawiszy
   keypad.begin(makeKeymap(keys));
@@ -283,15 +292,50 @@ void sendPostToServer(String command) // Komuniacja z serverem przez WiFi.
  * @napis_top char[16] napis na górę
  * @napis_bot char[16] napis na dół
  */ 
-void display_on_lcd(char napis_top[16], char napis_bottom[16])
+void display_on_lcd(char napis_top[16] = "                ", char napis_bottom[16] = "                ")
 {
-  if (LockClearRequested)
-    remove_timeout(RESET_LOCK_TIMEOUT);
+    // Jeżeli mamy timeout na reset stanu
+    if (DisplayClearRequested)
+      remove_timeout(RESET_DISPLAY_TIMEOUT);
+      change_rgb_color(RgbColor::Blue);
 
     lcd.setCursor(0, 0);
     lcd.print(napis_top);
     lcd.setCursor(0, 1);
     lcd.print(napis_bottom);
+}
+
+/**
+ * Funkcja zmieniająca kolor diody
+ * @color: RgbColor docelowy kolor diody
+ */ 
+void change_rgb_color(const RgbColor &color)
+{
+  // HIGH is off
+  // LOW  is ON
+  int red = HIGH,
+      blue = HIGH,
+      green = HIGH;
+
+  switch(color){
+    case RgbColor::Blue:
+      blue = HIGH;
+      break;
+    case RgbColor::Red:
+      red = LOW;
+      break;
+    case RgbColor::Green:
+      green = LOW;
+      break;
+    case RgbColor::Off:
+      break;
+    default:
+      break;
+  }
+
+  expander_1.digitalWrite(RGB_GREEN_PIN, green);
+  expander_1.digitalWrite(RGB_RED_PIN, red);
+  expander_1.digitalWrite(RGB_BLUE_PIN, blue);
 }
 
 /**
@@ -305,22 +349,24 @@ void change_and_display_lock_state(LockState stan)
   case LockState::Open:
     display_on_lcd("Drzwi otwarte   ", "****************");
     expander_1.digitalWrite(ZAMEK_PIN, ZAMEK_OPEN);
+    change_rgb_color(RgbColor::Green);
     lockState = LockState::Open;
     break;
 
   case LockState::Closed:
-    expander_1.digitalWrite(ZAMEK_PIN, ZAMEK_CLOSED);
-    //Serial.println("coś");
     display_on_lcd("Drzwi zamkniete ", "****************");
+    expander_1.digitalWrite(ZAMEK_PIN, ZAMEK_CLOSED);
+    change_rgb_color(RgbColor::Blue);
     lockState = LockState::Closed;
     break;
 
   case LockState::Blocked:
-    expander_1.digitalWrite(ZAMEK_PIN, ZAMEK_CLOSED);
     display_on_lcd("Blokada dostepu ", "****************");
+    expander_1.digitalWrite(ZAMEK_PIN, ZAMEK_CLOSED);
+    change_rgb_color(RgbColor::Red);
     lockState = LockState::Blocked;
-    LockClearRequested = true;
-    set_timeout(reset_lock, RESET_LOCK_TIMEOUT_TIME, RESET_LOCK_TIMEOUT);
+    DisplayClearRequested = true;
+    set_timeout(reset_display, RESET_DISPLAY_TIMEOUT_TIME, RESET_DISPLAY_TIMEOUT);
     break;
   
   default:
@@ -329,8 +375,8 @@ void change_and_display_lock_state(LockState stan)
   }
 }
 
-void reset_lock() {
-  LockClearRequested = false;
+void reset_display() {
+  DisplayClearRequested = false;
   change_and_display_lock_state(LockState::Closed);
 }
 
@@ -347,19 +393,46 @@ void handleRfid() {
 
   if (content.substring(1) == "7B 71 17 21") handleLockOpen();
   else if (content.substring(1) == "5B 05 49 0A") handleLockOpen();
-  else if (content.substring(1) == "43 D3 44 7A") display_on_lcd("Oddawaj zarowke  ", "****************");
+  else if (content.substring(1) == "43 D3 44 7A") display_on_lcd("Oddawaj zarowke  ", "****************"); // Przypadek Wojciaszek
   else {} //change_and_display_lock_state(LockState::Closed);
 }
 
 void handleKeyboard() {
   char key = keypad.getKey();
-  if(key) Serial.println(key);
-  if(key) handleKeyPress(key);
+
+  if(key) {
+    handleKeyPress(key);
+    D(key);
+  }
 }
 
+
+// Blokująca na chwilkę (KEYPAD_BEEP_TIME)
 void handleKeyPress(const char &key) {
+  expander_2.digitalWrite(BUZZER_PIN, ALARM_ON);
+  delay(KEYPAD_BEEP_TIME);
+  expander_2.digitalWrite(BUZZER_PIN, ALARM_OFF);
+
+  if (key == REMOVE_BUTTON_CHAR) {
+    // Kod nie jest wprowadzany
+    if (code_index == 0) return;
+
+    code_index--;
+
+    if (code_index == 0) {
+      // Usunięto cały kod
+      reset_display();
+    } else {
+      // Usunięto jeden znak
+      displayCode(code_index + 1);
+    }
+
+    return;
+  }
+
   code_current[code_index] = key;
   if (code_index == 3) {
+    // Zakończono wprowadzać kod
     if (!(strncmp(code_current, code_open, 4))) {
       handleLockOpen();
     } else {
@@ -367,9 +440,32 @@ void handleKeyPress(const char &key) {
     }
 
     code_index = 0;
+  } else {
+    // W trakcie wprowadzania kodu
+    code_index++;
+    displayCode(code_index + 1);
+  }
+}
+
+void clearCode() {
+  code_index = 0;
+}
+
+void displayCode(const int &code_length) {
+  String code_text = "Kod: ";
+  char buf[DISPLAY_LENGTH];
+
+  for (int i = 0; i < code_length; i++ ){ 
+    code_text += '*';
   }
 
-  code_index++;
+  for (int i = code_text.length(); i < DISPLAY_LENGTH; i++ ){ 
+    code_text += ' ';
+  }
+
+  code_text.toCharArray(buf, DISPLAY_LENGTH);
+
+  display_on_lcd(buf);
 }
 
 void handleLockOpen() {
@@ -451,17 +547,17 @@ void handleSensors() {
 
 void loop()
 {
-  //Serial.println("timeouts");
+    D("timeouts");
   handle_timeouts();
-  //Serial.println("keyboard");
-  handleKeyboard();
-  //Serial.println("rfid");
+    D("rfid");
   handleRfid();
-  ////Serial.println("sensors");
+    D("sensors");
   //handleSensors();
-  //Serial.println("delay");
+    D("delay");
   
  
-
-  delay(1000);
+  for (int i = 0; i < KEYPAD_TRIES_NUMBER; i++) {
+      D("keyboard");
+    handleKeyboard();
+  }
 }

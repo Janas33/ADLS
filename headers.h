@@ -7,4 +7,11 @@ enum LockState {
   Blocked
 };
 
+enum RgbColor {
+  Red,
+  Green,
+  Blue,
+  Off
+};
+
 void changeDoorStateAndDisplay(LockState stan);
