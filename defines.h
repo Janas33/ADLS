@@ -40,9 +40,9 @@
 #define RFID_SS_PIN        15       // Przypisanie SS_PIN z RFID do wejścia D8.
 #define RFID_RST_PIN        2       // Przypisanie RST_PIN z RFID do wejścia D4.
 
-#define RGB_RED_PIN    5
-#define RGB_BLUE_PIN   6
-#define RGB_GREEN_PIN  7
+#define RGB_RED_PIN    1
+#define RGB_BLUE_PIN   2
+#define RGB_GREEN_PIN  3
 
 #define BUZZER_PIN 4
 
