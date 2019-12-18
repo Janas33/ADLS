@@ -91,8 +91,6 @@ LockState lockState = LockState::Closed;
 PCF8574 expander_1(EXPANDER_1_ADDR);
 PCF8574 expander_2(EXPANDER_2_ADDR);
 
-
-
 /*
 *   Inicjalizacja wyświetlacza lcd, na adresie LIQUID_CRYSTAL_I2C_ADD
 *   z DISPLAY_LENGTH znakami na 2 rzędach
@@ -430,6 +428,8 @@ void handleKeyPress(const char &key) {
     return;
   }
 
+  D("code_index");
+  D(code_index);
   code_current[code_index] = key;
   if (code_index == 3) {
     // Zakończono wprowadzać kod
@@ -555,9 +555,8 @@ void loop()
   //handleSensors();
     D("delay");
   
- 
+    D("keyboard");
   for (int i = 0; i < KEYPAD_TRIES_NUMBER; i++) {
-      D("keyboard");
     handleKeyboard();
   }
 }
