@@ -40,7 +40,7 @@ void handle_timeouts() {
   for (int i = 0; i < timeout_registry.size(); i++) {
     timeoutData = &timeout_registry[i];
 
-    //Serial.println("handle_timeouts pętla: " + String(timeoutData->name) + ", milis: " +  String(timeoutData->timeout) + ", curr: " + String(millis()) );
+    Serial.println("handle_timeouts pętla: " + String(timeoutData->name) + ", milis: " +  String(timeoutData->timeout) + ", curr: " + String(millis()) );
     if (timeoutData->timeout < millis()) {
 			timeoutData->f();
 			timeout_registry.erase(timeout_registry.begin() + i);
@@ -156,7 +156,8 @@ void setup()
   expander_1.pinMode(RGB_BLUE_PIN, OUTPUT);
   expander_1.pinMode(RGB_GREEN_PIN, OUTPUT);
   expander_1.pinMode(ALARM_PIN, OUTPUT);      // Deklaracja alarmu przez ekspander jako wyjścia.
-  expander_1.pinMode(BUZZER_PIN, OUTPUT);
+  expander_2.pinMode(BUZZER_PIN, OUTPUT);
+  expander_1.pinMode(PRZYCISK_PIN, INPUT);
 
    // Inicjalizacja keypada, z wcześniej ustawionym mapowaniem klawiszy
   keypad.begin(makeKeymap(keys));
@@ -172,6 +173,8 @@ void setup()
   WiFi.mode(WIFI_STA);
   // Określenie nazwy i hasła do sieci, z którą mamy się połączyć.
   WiFiMulti.addAP("Wojciaszek", "wojciaszek3213"); 
+
+  change_rgb_color(RgbColor::Blue);
 }
 
 /**
@@ -290,12 +293,14 @@ void sendPostToServer(String command) // Komuniacja z serverem przez WiFi.
  * @napis_top char[16] napis na górę
  * @napis_bot char[16] napis na dół
  */ 
-void display_on_lcd(char napis_top[16] = "                ", char napis_bottom[16] = "                ")
+void display_on_lcd(char napis_top[16], char napis_bottom[16])
 {
     // Jeżeli mamy timeout na reset stanu
-    if (DisplayClearRequested)
+    if (DisplayClearRequested) {
       remove_timeout(RESET_DISPLAY_TIMEOUT);
+      DisplayClearRequested = false;
       change_rgb_color(RgbColor::Blue);
+    }
 
     lcd.setCursor(0, 0);
     lcd.print(napis_top);
@@ -311,19 +316,19 @@ void change_rgb_color(const RgbColor &color)
 {
   // HIGH is off
   // LOW  is ON
-  int red = HIGH,
-      blue = HIGH,
-      green = HIGH;
+  int red = LOW,
+      blue = LOW,
+      green = LOW;
 
   switch(color){
     case RgbColor::Blue:
       blue = HIGH;
       break;
     case RgbColor::Red:
-      red = LOW;
+      red = HIGH;
       break;
     case RgbColor::Green:
-      green = LOW;
+      green = HIGH;
       break;
     case RgbColor::Off:
       break;
@@ -364,7 +369,7 @@ void change_and_display_lock_state(LockState stan)
     change_rgb_color(RgbColor::Red);
     lockState = LockState::Blocked;
     DisplayClearRequested = true;
-    set_timeout(reset_display, RESET_DISPLAY_TIMEOUT_TIME, RESET_DISPLAY_TIMEOUT);
+    set_timeout(delayed_reset_display, millis() + RESET_DISPLAY_TIMEOUT_TIME, RESET_DISPLAY_TIMEOUT);
     break;
   
   default:
@@ -373,8 +378,12 @@ void change_and_display_lock_state(LockState stan)
   }
 }
 
-void reset_display() {
+void delayed_reset_display() {
   DisplayClearRequested = false;
+  reset_display();
+}
+
+void reset_display() {
   change_and_display_lock_state(LockState::Closed);
 }
 
@@ -395,9 +404,13 @@ void handleRfid() {
   else {} //change_and_display_lock_state(LockState::Closed);
 }
 
+void handleButton()
+{
+  if(expander_1.digitalRead(PRZYCISK_PIN) == HIGH) handleLockOpen() ;
+}
+
 void handleKeyboard() {
   char key = keypad.getKey();
-
   if(key) {
     handleKeyPress(key);
     D(key);
@@ -423,7 +436,7 @@ void handleKeyPress(const char &key) {
       reset_display();
     } else {
       // Usunięto jeden znak
-      displayCode(code_index + 1);
+      displayCode(code_index);
     }
 
     return;
@@ -443,12 +456,12 @@ void handleKeyPress(const char &key) {
       change_and_display_lock_state(LockState::Blocked);
     }
 
-    code_index = 0;
+    clearCode();
   } else {
     D("W trakcie wprowadzania kodu");
     // W trakcie wprowadzania kodu
     code_index++;
-    displayCode(code_index + 1);
+    displayCode(code_index);
   }
 }
 
@@ -470,7 +483,7 @@ void displayCode(const int &code_length) {
 
   code_text.toCharArray(buf, DISPLAY_LENGTH);
 
-  display_on_lcd(buf);
+  display_on_lcd(buf, "                ");
 }
 
 void handleLockOpen() {
@@ -561,7 +574,8 @@ void loop()
   
     //D("keyboard");
   for (int i = 0; i < KEYPAD_TRIES_NUMBER; i++) {
-    delay(5);
+    delay(KEYPAD_TRIES_DELAY);
     handleKeyboard();
+    handleButton();
   }
 }

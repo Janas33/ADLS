@@ -12,14 +12,15 @@
 // Standard defines
 #define API_URL "http://adls.herokuapp.com/api/locks/570781de-9fce-4f0c-bbe6-681fcb8a15be/"
 
-#define KEYPAD_TRIES_NUMBER 100
+#define KEYPAD_TRIES_NUMBER 20
+#define KEYPAD_TRIES_DELAY   5
 
 #define DISPLAY_LENGTH 16
 #define DISPLAY_WIDTH  2
 
 #define REMOVE_BUTTON_CHAR 'C'
 
-#define KEYPAD_BEEP_TIME 50
+#define KEYPAD_BEEP_TIME 20
 
 // Stany
 #define ZAMEK_CLOSED     HIGH
@@ -42,17 +43,17 @@
 
 #define RGB_RED_PIN    1
 #define RGB_BLUE_PIN   2
-#define RGB_GREEN_PIN  3
+#define RGB_GREEN_PIN  4
 
 #define BUZZER_PIN 4
-
+#define PRZYCISK_PIN 5
 
 
 // Addressy
 #define KEYPAD_I2C_ADDR         0x20       // KEYPAD
-#define LIQUID_CRYSTAL_I2C_ADDR 0X25       // LCD
+#define LIQUID_CRYSTAL_I2C_ADDR 0X27       // LCD
 #define EXPANDER_1_ADDR         0X26       // DIODY
-#define EXPANDER_2_ADDR         0X27       // SILNIK, BUZZER..
+#define EXPANDER_2_ADDR         0X25       // SILNIK, BUZZER..
 
 
 // Timeouty
