@@ -412,6 +412,7 @@ void handleKeyPress(const char &key) {
   expander_2.digitalWrite(BUZZER_PIN, ALARM_OFF);
 
   if (key == REMOVE_BUTTON_CHAR) {
+    D("Remove key pressed");
     // Kod nie jest wprowadzany
     if (code_index == 0) return;
 
@@ -432,15 +433,19 @@ void handleKeyPress(const char &key) {
   D(code_index);
   code_current[code_index] = key;
   if (code_index == 3) {
+    D("Zakończono wprowadzać kod");
     // Zakończono wprowadzać kod
     if (!(strncmp(code_current, code_open, 4))) {
+      D("Otwarcie");
       handleLockOpen();
     } else {
+      D("Blokada");
       change_and_display_lock_state(LockState::Blocked);
     }
 
     code_index = 0;
   } else {
+    D("W trakcie wprowadzania kodu");
     // W trakcie wprowadzania kodu
     code_index++;
     displayCode(code_index + 1);
@@ -547,16 +552,16 @@ void handleSensors() {
 
 void loop()
 {
-    D("timeouts");
+    //D("timeouts");
   handle_timeouts();
-    D("rfid");
+    //D("rfid");
   handleRfid();
-    D("sensors");
+    //D("sensors");
   //handleSensors();
-    D("delay");
   
-    D("keyboard");
+    //D("keyboard");
   for (int i = 0; i < KEYPAD_TRIES_NUMBER; i++) {
+    delay(5);
     handleKeyboard();
   }
 }
