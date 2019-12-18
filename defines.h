@@ -19,7 +19,10 @@
 #define RFID_SS_PIN        15       // Przypisanie SS_PIN z RFID do wejścia D8.
 #define RFID_RST_PIN        2       // Przypisanie RST_PIN z RFID do wejścia D4.
 
-#define KEYPAD_I2C_ADDR  0x21       // Ustawienie adresu na magistrali na 0x21.
+#define KEYPAD_I2C_ADDR  0x20       // Ustawienie adresu na magistrali na 0x21.
+#define LIQUID_CRYSTAL_I2C_ADD  0X25            // SILNIK, BUZZER..
+#define EXPANDER_1  0X26            // DIODY
+#define EXPANDER_2 0X27            // LCD
 
 #define CLOSE_LOCK_TIMEOUT "CLOSE_LOCK_TIMEOUT"
 #define CLOSE_LOCK_TIMEOUT_TIME 3000

@@ -85,12 +85,12 @@ LockState lockState = LockState::Closed;
 /*
 *   Inicjalizacja ekspander_1, na adresie 0x20
 */
-PCF8574 expander_1(0x26);
+PCF8574 expander_1(EXPANDER_1);
 /*
 *   Inicjalizacja wyświetlacza lcd, na adresie 0x27
 *   z 16 znakami na 2 rzędach
 */
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+LiquidCrystal_I2C lcd(LIQUID_CRYSTAL_I2C_ADD, 16, 2);
 
 
 // Wifi
@@ -353,7 +353,7 @@ void handleRfid() {
 
 void handleKeyboard() {
   char key = keypad.getKey();
-
+  if(key) Serial.println(key);
   if(key) handleKeyPress(key);
 }
 
@@ -461,6 +461,7 @@ void loop()
   //handleSensors();
   //Serial.println("delay");
   
+ 
 
   delay(1000);
 }
