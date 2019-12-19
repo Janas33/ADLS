@@ -2,6 +2,7 @@
 
 // TO USUŃ JAK NIE DZIAŁA
 #define ARDUINO 101
+#undef _WIN32
 
 #include <ESP8266WiFi.h>       // Biblioteka do WiFI.
 #include <ESP8266HTTPClient.h> // Biblioteka do WiFI.
@@ -16,3 +17,4 @@
 #include <MFRC522.h>           // Biblioteka do RFID.
 #include <Gsender.h>           // Biblioteka do wysyłania maila.
 #include <vector>
+#include <ArduinoWebsockets.h>

@@ -3,6 +3,8 @@
 #include "src/headers.h"
 #include "src/timeouts.hpp"
 
+using namespace websockets;
+
 bool LockCloseRequested = false;
 bool LockCloseCompleted = false;
 
@@ -46,7 +48,11 @@ const char *password = WIFI_PASSWORD; // WIFI network password
 uint8_t connection_state = 0;            // Connected to WIFI or not
 uint16_t reconnect_interval = WIFI_RECONNECT_INTERVAL;     // If not connected wait time to try again
 
-ESP8266WiFiMulti WiFiMulti;
+
+// Websockets
+const char* websockets_server = WEBSOCKETS_URL; //server adress and port
+
+WebsocketsClient ws_client;
 
 // Rfid
 MFRC522 mfrc522(RFID_SS_PIN, RFID_RST_PIN); // Create MFRC522 instance.
@@ -83,16 +89,6 @@ void setup()
   // Inicjalizacja biblioteki do komunikacji po protokołach
   Wire.begin();
 
-  // Lcd
-  lcd.begin(16, 2);              // .
-  lcd.backlight();               // . Załączenie podświetlenia.
-  lcd.setCursor(0, 0);           // .
-  lcd.print("      ADLS      ");        // .
-  lcd.setCursor(0, 1);           // .
-  lcd.print("    --------    "); // .
-
-  pinMode(CZUJNIK_DRZWI_PIN, INPUT_PULLUP); // Deklaracja czujnika jako wejścia, i wewnętrzne podciągnięcie go
-
   expander_1.pinMode(ZAMEK_PIN, OUTPUT);      // Deklaracja zamka przez ekspander jako wyjścia.
   expander_1.pinMode(RGB_RED_PIN, OUTPUT);
   expander_1.pinMode(RGB_BLUE_PIN, OUTPUT);
@@ -101,6 +97,18 @@ void setup()
   expander_1.pinMode(PRZYCISK_PIN, INPUT);
   
   expander_2.pinMode(BUZZER_PIN, OUTPUT);
+  
+  change_rgb_color(RgbColor::Cyan);
+  expander_2.digitalWrite(ALARM_PIN, ALARM_OFF);
+  expander_1.digitalWrite(ZAMEK_PIN, ZAMEK_CLOSED);
+
+  // Lcd
+  lcd.begin(16, 2);              // .
+  lcd.backlight();               // . Załączenie podświetlenia.
+  lcd.setCursor(0, 0);           // .
+  lcd.print("      ADLS      ");        // .
+  lcd.setCursor(0, 1);           // .
+  lcd.print("    --------    "); // .
 
    // Inicjalizacja keypada, z wcześniej ustawionym mapowaniem klawiszy
   keypad.begin(makeKeymap(keys));
@@ -112,18 +120,37 @@ void setup()
   SPI.begin();        // Initiate  SPI bus
   mfrc522.PCD_Init(); // Initiate MFRC522
 
-  // Inicjalizacja wifi z trybem WIFI_STA (klient (?))
-  WiFi.mode(WIFI_STA);
-  // Określenie nazwy i hasła do sieci, z którą mamy się połączyć.
-  WiFiMulti.addAP(WIFI_SSID, WIFI_PASSWORD); 
+  // Wifi
+  WiFi.begin(ssid, password);
+
+  // Wait some time to connect to wifi
+  for(int i = 0; i < 10 && WiFi.status() != WL_CONNECTED; i++) {
+      Serial.print(".");
+      delay(1000);
+  }
+
+  // Setup Callbacks
+  ws_client.onMessage(onMessageCallback);
+  ws_client.onEvent(onEventsCallback);
+  
+  // Connect to server
+  bool connected = ws_client.connect(websockets_server);
+  D("Connected to ws: \/");
+  D(connected);
+
+  // Connect to channel
+  ws_client.send("{\"command\":\"subscribe\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\"}");
+  // Send a ping
+  ws_client.ping();
 
   change_rgb_color(RgbColor::Blue);
-  expander_2.digitalWrite(ALARM_PIN, ALARM_OFF);
 }
 
+#pragma region StareWifi
 /**
  *  Funkcja służąca do połączenia się z wifi
  */
+/*
 uint8_t WiFiConnect(const char *nSSID = nullptr, const char *nPassword = nullptr)
 {
   static uint16_t attempt = 0;
@@ -164,11 +191,13 @@ uint8_t WiFiConnect(const char *nSSID = nullptr, const char *nPassword = nullptr
   //Serial.println(WiFi.localIP());
   return true;
 }
+*/
 
 /**
  * BLOKUJĄCA!!!
  * Funkcja próbująca się połączyć z wifi jeszcze raz
  */ 
+/*
 void retryWifiConnection()
 {
   uint32_t ts = millis();
@@ -182,12 +211,14 @@ void retryWifiConnection()
     }
   }
 }
+*/
 
 /**
  * PSEUDOBLOKUJĄCA (aż do uzyskania odpowiedzi od serwera)
  * Funkcja wysyłająca POST request pod adres serwera + command
  * 
  */ 
+/*
 void sendPostToServer(String command) // Komuniacja z serverem przez WiFi.
 {                                 //$todo dodać wysyłanie stanu drzwi i stanu czujników
   // wait for WiFi connection
@@ -230,6 +261,28 @@ void sendPostToServer(String command) // Komuniacja z serverem przez WiFi.
     }
   }
 }
+*/
+#pragma endregion StareWifi
+
+// Funckcje do WebSocket
+void onMessageCallback(WebsocketsMessage message) {
+    Serial.print("Got Message: ");
+    Serial.println(message.data());
+}
+
+void onEventsCallback(WebsocketsEvent event, String data) {
+    if(event == WebsocketsEvent::ConnectionOpened) {
+        Serial.println("Connnection Opened");
+    } else if(event == WebsocketsEvent::ConnectionClosed) {
+        Serial.println("Connnection Closed");
+    } else if(event == WebsocketsEvent::GotPing) {
+        Serial.println("Got a Ping!");
+    } else if(event == WebsocketsEvent::GotPong) {
+        Serial.println("Got a Pong!");
+    }
+}
+
+
 
 /**
  * Funkcja wyświetlająca dwa napisy na wyświetlaczu
@@ -273,6 +326,10 @@ void change_rgb_color(const RgbColor &color)
       break;
     case RgbColor::Green:
       green = HIGH;
+      break;
+    case RgbColor::Cyan:
+      green = HIGH;
+      blue = HIGH;
       break;
     case RgbColor::Off:
       break;
@@ -426,7 +483,7 @@ void displayCode(const int &code_length) {
 
   code_text.toCharArray(buf, DISPLAY_LENGTH);
 
-  display_on_lcd(buf, "                ");
+  display_on_lcd(buf, EMPTY_LCD_LINE);
 }
 
 void handleLockOpen() {
@@ -445,6 +502,9 @@ void handleLockOpen() {
     }
   }
 
+  D("Sending opening of lock state");
+  ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"opened\\\"}\"}");
+  D("Done sending opening of lock state");
   openLock();
 }
 
@@ -457,6 +517,9 @@ void openLock() {
 }
 
 void closeLock() {
+  D("Sending closing of lock state");
+  ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"closed\\\"}\"}");
+  D("Done sending closing of lock state");
   change_and_display_lock_state(LockState::Closed);
   LockCloseCompleted = true;
 }
@@ -508,6 +571,7 @@ void handleSensors() {
 
 void loop()
 {
+  if (ws_client.available()) ws_client.poll();
     //D("timeouts");
   handle_timeouts();
     //D("rfid");
@@ -515,10 +579,12 @@ void loop()
     //D("sensors");
   //handleSensors();
   
-    //D("keyboard");
   for (int i = 0; i < KEYPAD_TRIES_NUMBER; i++) {
     delay(KEYPAD_TRIES_DELAY);
-    handleKeyboard();
+    if (lockState == LockState::Closed) {
+      handleKeyboard();
+      //D("Handling keyboard");
+    }
     handleButton();
   }
 }

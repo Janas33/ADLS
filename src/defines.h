@@ -12,8 +12,8 @@
 // Standard defines
 #define API_URL "http://adls.herokuapp.com/api/locks/570781de-9fce-4f0c-bbe6-681fcb8a15be/"
 
-#define KEYPAD_TRIES_NUMBER 20
-#define KEYPAD_TRIES_DELAY   5
+#define KEYPAD_TRIES_NUMBER 2
+#define KEYPAD_TRIES_DELAY   100
 
 #define DISPLAY_LENGTH 16
 #define DISPLAY_WIDTH  2
@@ -21,6 +21,8 @@
 #define REMOVE_BUTTON_CHAR 'C'
 
 #define KEYPAD_BEEP_TIME 20
+
+#define EMPTY_LCD_LINE "                "
 
 // Stany
 #define ZAMEK_CLOSED     HIGH
@@ -30,11 +32,14 @@
 
 
 // Wifi
-#define WIFI_SSID                 "Wojciaszek"         // WIFI network name
-#define WIFI_PASSWORD             "wojciaszek3213"     // WIFI network password
+// #define WIFI_SSID                 "Wojciaszek"         // WIFI network name
+// #define WIFI_PASSWORD             "wojciaszek3213"     // WIFI network password
+#define WIFI_SSID                 "Woz_obserwacyjny_342-R2"         // WIFI network name
+#define WIFI_PASSWORD             "Wojteklubi07"     // WIFI network password
 #define WIFI_RECONNECT_INTERVAL   10000               // If not connected wait time to try again
 
-
+// WebSockets
+#define WEBSOCKETS_URL "ws://192.168.1.11:3000/api/cable"
 
 // Piny
 #define CZUJNIK_DRZWI_PIN   0       // Przypisanie CZUJNIKA do wejścia D3.
