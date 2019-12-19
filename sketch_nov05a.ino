@@ -1,71 +1,7 @@
-// TO USUŃ JAK NIE DZIAŁA
-#define ARDUINO 101
-
-#include <ESP8266WiFi.h>       // Biblioteka do WiFI.
-#include <ESP8266HTTPClient.h> // Biblioteka do WiFI.
-#include <ESP8266WiFiMulti.h>  // Biblioteka do WiFI
-#include <WiFiClient.h>        // Biblioteka do WiFI.
-#include <PCF8574.h>           // Biblioteka do ekstendera wyprowadzeń PCF8574.
-#include <Keypad.h>            // Biblioteka do obsługi klawiatury.
-#include <LiquidCrystal_I2C.h> // Biblioteka do wyświetlacza tekstowego LCD z konwerterem I2C.
-#include <Wire.h>              // Biblioteka do komunikacji przez I2C.
-#include <Keypad_I2C.h>        // Biblioteka do podłączenia klawiatury przez magistrale.
-#include <SPI.h>               // Biblioteka do komunikacji z jednym lub większą liczbą urządzeń peryferyjnych.
-#include <MFRC522.h>           // Biblioteka do RFID.
-#include <Gsender.h>           // Biblioteka do wysyłania maila.
-#include <vector>
-
-#include "defines.h"
-#include "headers.h"
-
-// Timeouts code
-struct TimeoutData {
-	TimeoutData(void f(), const int &t, const char *n) : timeout(t), f(f), name(n) {}
-	void(*f)();
-	int timeout;
-  const char *name;
-};
-
-std::vector<struct TimeoutData> timeout_registry;
-
-void set_timeout(void f(), const int &time, const char *name) {
-  //Serial.println("set_timeout: " + String(name)); 
-	timeout_registry.push_back(TimeoutData(f, time, name));
-}
-
-void handle_timeouts() {
-  TimeoutData *timeoutData;
-
-  //Serial.println("handle_timeouts in  timeoutów łącznie:" + timeout_registry.size()  );
-  for (int i = 0; i < timeout_registry.size(); i++) {
-    timeoutData = &timeout_registry[i];
-
-    Serial.println("handle_timeouts pętla: " + String(timeoutData->name) + ", milis: " +  String(timeoutData->timeout) + ", curr: " + String(millis()) );
-    if (timeoutData->timeout < millis()) {
-			timeoutData->f();
-			timeout_registry.erase(timeout_registry.begin() + i);
-		}
-  }
-  //Serial.println("handle_timeouts out timeoutów łącznie: " + String(timeout_registry.size()) );
-}
-
-void remove_timeout(const char *name) {
-  for (int i = 0; i < timeout_registry.size(); i++) {
-    if (strcmp(timeout_registry[i].name, name))
-			timeout_registry.erase(timeout_registry.begin() + i);
-  }
-}
-
-TimeoutData* find_timeout(const char *name) { 
-  Serial.println("find_timeout for: " + String(name) );
-  for (int i = 0; i < timeout_registry.size(); i++) {
-    Serial.println("find_timeout got: " + String(timeout_registry[i].name) + " vs " + String(name)  );
-    if (strcmp(timeout_registry[i].name, name) == 0)
-      return &timeout_registry[i];
-  }
-
-  return NULL;
-}
+#include "src/includes.h"
+#include "src/defines.h"
+#include "src/headers.h"
+#include "src/timeouts.hpp"
 
 bool LockCloseRequested = false;
 bool LockCloseCompleted = false;
@@ -89,6 +25,12 @@ LockState lockState = LockState::Closed;
  * Diodę RGB
 */
 PCF8574 expander_1(EXPANDER_1_ADDR);
+/*
+ *   Inicjalizacja ekspander_1, na adresie EXPANDER_1
+ * Obsługuje:
+ * Buzzer (alarm)
+ * Silnik
+*/
 PCF8574 expander_2(EXPANDER_2_ADDR);
 
 /*
@@ -99,10 +41,10 @@ LiquidCrystal_I2C lcd(LIQUID_CRYSTAL_I2C_ADDR, DISPLAY_LENGTH, DISPLAY_WIDTH);
 
 
 // Wifi
-const char *ssid = "Wojciaszek";         // WIFI network name
-const char *password = "wojciaszek3213"; // WIFI network password
+const char *ssid = WIFI_SSID;         // WIFI network name
+const char *password = WIFI_PASSWORD; // WIFI network password
 uint8_t connection_state = 0;            // Connected to WIFI or not
-uint16_t reconnect_interval = 10000;     // If not connected wait time to try again
+uint16_t reconnect_interval = WIFI_RECONNECT_INTERVAL;     // If not connected wait time to try again
 
 ESP8266WiFiMulti WiFiMulti;
 
@@ -129,12 +71,12 @@ byte colPins[COLS] = {4, 5, 6, 7}; // numeryu dla kolumn
  */
 Keypad_I2C keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS, KEYPAD_I2C_ADDR);
 
-#pragma endregion Globals
-
 // Code variables
 int code_index = 0;
 char code_current[4];
 char code_open[] = "1234";
+
+#pragma endregion Globals
 
 void setup()
 {
@@ -156,8 +98,9 @@ void setup()
   expander_1.pinMode(RGB_BLUE_PIN, OUTPUT);
   expander_1.pinMode(RGB_GREEN_PIN, OUTPUT);
   expander_1.pinMode(ALARM_PIN, OUTPUT);      // Deklaracja alarmu przez ekspander jako wyjścia.
-  expander_2.pinMode(BUZZER_PIN, OUTPUT);
   expander_1.pinMode(PRZYCISK_PIN, INPUT);
+  
+  expander_2.pinMode(BUZZER_PIN, OUTPUT);
 
    // Inicjalizacja keypada, z wcześniej ustawionym mapowaniem klawiszy
   keypad.begin(makeKeymap(keys));
@@ -172,9 +115,10 @@ void setup()
   // Inicjalizacja wifi z trybem WIFI_STA (klient (?))
   WiFi.mode(WIFI_STA);
   // Określenie nazwy i hasła do sieci, z którą mamy się połączyć.
-  WiFiMulti.addAP("Wojciaszek", "wojciaszek3213"); 
+  WiFiMulti.addAP(WIFI_SSID, WIFI_PASSWORD); 
 
   change_rgb_color(RgbColor::Blue);
+  expander_2.digitalWrite(ALARM_PIN, ALARM_OFF);
 }
 
 /**
@@ -416,7 +360,6 @@ void handleKeyboard() {
     D(key);
   }
 }
-
 
 // Blokująca na chwilkę (KEYPAD_BEEP_TIME)
 void handleKeyPress(const char &key) {

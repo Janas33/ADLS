@@ -29,6 +29,11 @@
 #define ALARM_OFF     LOW
 
 
+// Wifi
+#define WIFI_SSID                 "Wojciaszek"         // WIFI network name
+#define WIFI_PASSWORD             "wojciaszek3213"     // WIFI network password
+#define WIFI_RECONNECT_INTERVAL   10000               // If not connected wait time to try again
+
 
 
 // Piny
