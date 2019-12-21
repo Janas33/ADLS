@@ -11,6 +11,7 @@ enum RgbColor {
   Red,
   Green,
   Blue,
+  Cyan,
   Off
 };
 

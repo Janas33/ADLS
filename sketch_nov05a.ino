@@ -1,71 +1,9 @@
-// TO USUŃ JAK NIE DZIAŁA
-#define ARDUINO 101
+#include "src/includes.h"
+#include "src/defines.h"
+#include "src/headers.h"
+#include "src/timeouts.hpp"
 
-#include <ESP8266WiFi.h>       // Biblioteka do WiFI.
-#include <ESP8266HTTPClient.h> // Biblioteka do WiFI.
-#include <ESP8266WiFiMulti.h>  // Biblioteka do WiFI
-#include <WiFiClient.h>        // Biblioteka do WiFI.
-#include <PCF8574.h>           // Biblioteka do ekstendera wyprowadzeń PCF8574.
-#include <Keypad.h>            // Biblioteka do obsługi klawiatury.
-#include <LiquidCrystal_I2C.h> // Biblioteka do wyświetlacza tekstowego LCD z konwerterem I2C.
-#include <Wire.h>              // Biblioteka do komunikacji przez I2C.
-#include <Keypad_I2C.h>        // Biblioteka do podłączenia klawiatury przez magistrale.
-#include <SPI.h>               // Biblioteka do komunikacji z jednym lub większą liczbą urządzeń peryferyjnych.
-#include <MFRC522.h>           // Biblioteka do RFID.
-#include <Gsender.h>           // Biblioteka do wysyłania maila.
-#include <vector>
-
-#include "defines.h"
-#include "headers.h"
-
-// Timeouts code
-struct TimeoutData {
-	TimeoutData(void f(), const int &t, const char *n) : timeout(t), f(f), name(n) {}
-	void(*f)();
-	int timeout;
-  const char *name;
-};
-
-std::vector<struct TimeoutData> timeout_registry;
-
-void set_timeout(void f(), const int &time, const char *name) {
-  //Serial.println("set_timeout: " + String(name)); 
-	timeout_registry.push_back(TimeoutData(f, time, name));
-}
-
-void handle_timeouts() {
-  TimeoutData *timeoutData;
-
-  //Serial.println("handle_timeouts in  timeoutów łącznie:" + timeout_registry.size()  );
-  for (int i = 0; i < timeout_registry.size(); i++) {
-    timeoutData = &timeout_registry[i];
-
-    Serial.println("handle_timeouts pętla: " + String(timeoutData->name) + ", milis: " +  String(timeoutData->timeout) + ", curr: " + String(millis()) );
-    if (timeoutData->timeout < millis()) {
-			timeoutData->f();
-			timeout_registry.erase(timeout_registry.begin() + i);
-		}
-  }
-  //Serial.println("handle_timeouts out timeoutów łącznie: " + String(timeout_registry.size()) );
-}
-
-void remove_timeout(const char *name) {
-  for (int i = 0; i < timeout_registry.size(); i++) {
-    if (strcmp(timeout_registry[i].name, name))
-			timeout_registry.erase(timeout_registry.begin() + i);
-  }
-}
-
-TimeoutData* find_timeout(const char *name) { 
-  Serial.println("find_timeout for: " + String(name) );
-  for (int i = 0; i < timeout_registry.size(); i++) {
-    Serial.println("find_timeout got: " + String(timeout_registry[i].name) + " vs " + String(name)  );
-    if (strcmp(timeout_registry[i].name, name) == 0)
-      return &timeout_registry[i];
-  }
-
-  return NULL;
-}
+using namespace websockets;
 
 bool LockCloseRequested = false;
 bool LockCloseCompleted = false;
@@ -89,6 +27,12 @@ LockState lockState = LockState::Closed;
  * Diodę RGB
 */
 PCF8574 expander_1(EXPANDER_1_ADDR);
+/*
+ *   Inicjalizacja ekspander_1, na adresie EXPANDER_1
+ * Obsługuje:
+ * Buzzer (alarm)
+ * Silnik
+*/
 PCF8574 expander_2(EXPANDER_2_ADDR);
 
 /*
@@ -99,12 +43,16 @@ LiquidCrystal_I2C lcd(LIQUID_CRYSTAL_I2C_ADDR, DISPLAY_LENGTH, DISPLAY_WIDTH);
 
 
 // Wifi
-const char *ssid = "Wojciaszek";         // WIFI network name
-const char *password = "wojciaszek3213"; // WIFI network password
+const char *ssid = WIFI_SSID;         // WIFI network name
+const char *password = WIFI_PASSWORD; // WIFI network password
 uint8_t connection_state = 0;            // Connected to WIFI or not
-uint16_t reconnect_interval = 10000;     // If not connected wait time to try again
+uint16_t reconnect_interval = WIFI_RECONNECT_INTERVAL;     // If not connected wait time to try again
 
-ESP8266WiFiMulti WiFiMulti;
+
+// Websockets
+const char* websockets_server = WEBSOCKETS_URL; //server adress and port
+
+WebsocketsClient ws_client;
 
 // Rfid
 MFRC522 mfrc522(RFID_SS_PIN, RFID_RST_PIN); // Create MFRC522 instance.
@@ -129,17 +77,30 @@ byte colPins[COLS] = {4, 5, 6, 7}; // numeryu dla kolumn
  */
 Keypad_I2C keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS, KEYPAD_I2C_ADDR);
 
-#pragma endregion Globals
-
 // Code variables
 int code_index = 0;
 char code_current[4];
 char code_open[] = "1234";
 
+#pragma endregion Globals
+
 void setup()
 {
   // Inicjalizacja biblioteki do komunikacji po protokołach
   Wire.begin();
+
+  expander_1.pinMode(ZAMEK_PIN, OUTPUT);      // Deklaracja zamka przez ekspander jako wyjścia.
+  expander_1.pinMode(RGB_RED_PIN, OUTPUT);
+  expander_1.pinMode(RGB_BLUE_PIN, OUTPUT);
+  expander_1.pinMode(RGB_GREEN_PIN, OUTPUT);
+  expander_1.pinMode(ALARM_PIN, OUTPUT);      // Deklaracja alarmu przez ekspander jako wyjścia.
+  expander_1.pinMode(PRZYCISK_PIN, INPUT);
+  
+  expander_2.pinMode(BUZZER_PIN, OUTPUT);
+  
+  change_rgb_color(RgbColor::Cyan);
+  expander_2.digitalWrite(ALARM_PIN, ALARM_OFF);
+  expander_1.digitalWrite(ZAMEK_PIN, ZAMEK_CLOSED);
 
   // Lcd
   lcd.begin(16, 2);              // .
@@ -148,16 +109,6 @@ void setup()
   lcd.print("      ADLS      ");        // .
   lcd.setCursor(0, 1);           // .
   lcd.print("    --------    "); // .
-
-  pinMode(CZUJNIK_DRZWI_PIN, INPUT_PULLUP); // Deklaracja czujnika jako wejścia, i wewnętrzne podciągnięcie go
-
-  expander_1.pinMode(ZAMEK_PIN, OUTPUT);      // Deklaracja zamka przez ekspander jako wyjścia.
-  expander_1.pinMode(RGB_RED_PIN, OUTPUT);
-  expander_1.pinMode(RGB_BLUE_PIN, OUTPUT);
-  expander_1.pinMode(RGB_GREEN_PIN, OUTPUT);
-  expander_1.pinMode(ALARM_PIN, OUTPUT);      // Deklaracja alarmu przez ekspander jako wyjścia.
-  expander_2.pinMode(BUZZER_PIN, OUTPUT);
-  expander_1.pinMode(PRZYCISK_PIN, INPUT);
 
    // Inicjalizacja keypada, z wcześniej ustawionym mapowaniem klawiszy
   keypad.begin(makeKeymap(keys));
@@ -169,17 +120,37 @@ void setup()
   SPI.begin();        // Initiate  SPI bus
   mfrc522.PCD_Init(); // Initiate MFRC522
 
-  // Inicjalizacja wifi z trybem WIFI_STA (klient (?))
-  WiFi.mode(WIFI_STA);
-  // Określenie nazwy i hasła do sieci, z którą mamy się połączyć.
-  WiFiMulti.addAP("Wojciaszek", "wojciaszek3213"); 
+  // Wifi
+  WiFi.begin(ssid, password);
+
+  // Wait some time to connect to wifi
+  for(int i = 0; i < 10 && WiFi.status() != WL_CONNECTED; i++) {
+      Serial.print(".");
+      delay(1000);
+  }
+
+  // Setup Callbacks
+  ws_client.onMessage(onMessageCallback);
+  ws_client.onEvent(onEventsCallback);
+  
+  // Connect to server
+  bool connected = ws_client.connect(websockets_server);
+  D("Connected to ws: \/");
+  D(connected);
+
+  // Connect to channel
+  ws_client.send("{\"command\":\"subscribe\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\"}");
+  // Send a ping
+  ws_client.ping();
 
   change_rgb_color(RgbColor::Blue);
 }
 
+#pragma region StareWifi
 /**
  *  Funkcja służąca do połączenia się z wifi
  */
+/*
 uint8_t WiFiConnect(const char *nSSID = nullptr, const char *nPassword = nullptr)
 {
   static uint16_t attempt = 0;
@@ -220,11 +191,13 @@ uint8_t WiFiConnect(const char *nSSID = nullptr, const char *nPassword = nullptr
   //Serial.println(WiFi.localIP());
   return true;
 }
+*/
 
 /**
  * BLOKUJĄCA!!!
  * Funkcja próbująca się połączyć z wifi jeszcze raz
  */ 
+/*
 void retryWifiConnection()
 {
   uint32_t ts = millis();
@@ -238,12 +211,14 @@ void retryWifiConnection()
     }
   }
 }
+*/
 
 /**
  * PSEUDOBLOKUJĄCA (aż do uzyskania odpowiedzi od serwera)
  * Funkcja wysyłająca POST request pod adres serwera + command
  * 
  */ 
+/*
 void sendPostToServer(String command) // Komuniacja z serverem przez WiFi.
 {                                 //$todo dodać wysyłanie stanu drzwi i stanu czujników
   // wait for WiFi connection
@@ -286,6 +261,28 @@ void sendPostToServer(String command) // Komuniacja z serverem przez WiFi.
     }
   }
 }
+*/
+#pragma endregion StareWifi
+
+// Funckcje do WebSocket
+void onMessageCallback(WebsocketsMessage message) {
+    Serial.print("Got Message: ");
+    Serial.println(message.data());
+}
+
+void onEventsCallback(WebsocketsEvent event, String data) {
+    if(event == WebsocketsEvent::ConnectionOpened) {
+        Serial.println("Connnection Opened");
+    } else if(event == WebsocketsEvent::ConnectionClosed) {
+        Serial.println("Connnection Closed");
+    } else if(event == WebsocketsEvent::GotPing) {
+        Serial.println("Got a Ping!");
+    } else if(event == WebsocketsEvent::GotPong) {
+        Serial.println("Got a Pong!");
+    }
+}
+
+
 
 /**
  * Funkcja wyświetlająca dwa napisy na wyświetlaczu
@@ -329,6 +326,10 @@ void change_rgb_color(const RgbColor &color)
       break;
     case RgbColor::Green:
       green = HIGH;
+      break;
+    case RgbColor::Cyan:
+      green = HIGH;
+      blue = HIGH;
       break;
     case RgbColor::Off:
       break;
@@ -417,7 +418,6 @@ void handleKeyboard() {
   }
 }
 
-
 // Blokująca na chwilkę (KEYPAD_BEEP_TIME)
 void handleKeyPress(const char &key) {
   expander_2.digitalWrite(BUZZER_PIN, ALARM_ON);
@@ -483,7 +483,7 @@ void displayCode(const int &code_length) {
 
   code_text.toCharArray(buf, DISPLAY_LENGTH);
 
-  display_on_lcd(buf, "                ");
+  display_on_lcd(buf, EMPTY_LCD_LINE);
 }
 
 void handleLockOpen() {
@@ -502,6 +502,9 @@ void handleLockOpen() {
     }
   }
 
+  D("Sending opening of lock state");
+  ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"opened\\\"}\"}");
+  D("Done sending opening of lock state");
   openLock();
 }
 
@@ -514,6 +517,9 @@ void openLock() {
 }
 
 void closeLock() {
+  D("Sending closing of lock state");
+  ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"closed\\\"}\"}");
+  D("Done sending closing of lock state");
   change_and_display_lock_state(LockState::Closed);
   LockCloseCompleted = true;
 }
@@ -565,6 +571,7 @@ void handleSensors() {
 
 void loop()
 {
+  if (ws_client.available()) ws_client.poll();
     //D("timeouts");
   handle_timeouts();
     //D("rfid");
@@ -572,10 +579,12 @@ void loop()
     //D("sensors");
   //handleSensors();
   
-    //D("keyboard");
   for (int i = 0; i < KEYPAD_TRIES_NUMBER; i++) {
     delay(KEYPAD_TRIES_DELAY);
-    handleKeyboard();
+    if (lockState == LockState::Closed) {
+      handleKeyboard();
+      //D("Handling keyboard");
+    }
     handleButton();
   }
 }
