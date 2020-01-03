@@ -74,9 +74,9 @@
  *
  * http://www.arduino.cc/en/Tutorial/Stepper
  */
-
+#define ARDUINO 101
 #include "Arduino.h"
-#include "Stepper.h"
+#include "stepper.h"
 
 /*
  * two-wire constructor.

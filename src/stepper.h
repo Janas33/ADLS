@@ -79,8 +79,8 @@
 #include <PCF8574.h>           // Biblioteka do ekstendera wyprowadzeń PCF8574.
 
 // ensure this library description is only included once
-#ifndef Stepper_h
-#define Stepper_h
+#ifndef stepper_h
+#define stepper_h
 
 
 // library interface description

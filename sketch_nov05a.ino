@@ -1,7 +1,9 @@
 #include "src/includes.h"
 #include "src/defines.h"
 #include "src/headers.h"
+#include "src/stepper.h"
 #include "src/timeouts.hpp"
+
 
 using namespace websockets;
 
@@ -14,6 +16,7 @@ bool AlarmRaiseRequested = false;
 bool AlarmRunning = false;
 
 
+
 // Global variables
 #pragma region Globals
 
@@ -21,19 +24,21 @@ bool AlarmRunning = false;
 LockState lockState = LockState::Closed;
 
 /*
- *   Inicjalizacja ekspander_1, na adresie EXPANDER_1
+ *   Inicjalizacja ekspander_1, na adresie EXPANDER_1_ADDR
  * Obsługuje:
  * Lock (zamek)
  * Diodę RGB
 */
 PCF8574 expander_1(EXPANDER_1_ADDR);
 /*
- *   Inicjalizacja ekspander_1, na adresie EXPANDER_1
+ *   Inicjalizacja ekspander_2, na adresie EXPANDER_2_ADDR
  * Obsługuje:
  * Buzzer (alarm)
  * Silnik
 */
 PCF8574 expander_2(EXPANDER_2_ADDR);
+
+Stepper motor(MOTOR_STEPS, MOTOR_PIN_4, MOTOR_PIN_2, MOTOR_PIN_3, MOTOR_PIN_1, &expander_2);
 
 /*
 *   Inicjalizacja wyświetlacza lcd, na adresie LIQUID_CRYSTAL_I2C_ADD
@@ -81,27 +86,36 @@ Keypad_I2C keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS, KEYPAD_I2C_ADD
 int code_index = 0;
 char code_current[4];
 char code_open[] = "1234";
+char code_roleta_lock[] ="7809";
+char code_roleta_unlock[] ="AB63";
 
+int ROLETA = UNLOCKED ; 
+int LOCK = CLOSED;
 #pragma endregion Globals
 
 void setup()
 {
   // Inicjalizacja biblioteki do komunikacji po protokołach
   Wire.begin();
-
+  
   expander_1.pinMode(ZAMEK_PIN, OUTPUT);      // Deklaracja zamka przez ekspander jako wyjścia.
   expander_1.pinMode(RGB_RED_PIN, OUTPUT);
   expander_1.pinMode(RGB_BLUE_PIN, OUTPUT);
   expander_1.pinMode(RGB_GREEN_PIN, OUTPUT);
-  expander_1.pinMode(ALARM_PIN, OUTPUT);      // Deklaracja alarmu przez ekspander jako wyjścia.
   expander_1.pinMode(PRZYCISK_PIN, INPUT);
-  
-  expander_2.pinMode(BUZZER_PIN, OUTPUT);
-  
-  change_rgb_color(RgbColor::Cyan);
-  expander_2.digitalWrite(ALARM_PIN, ALARM_OFF);
+  expander_1.pinMode(CZUJNIK_DRZWI_PIN,INPUT);
   expander_1.digitalWrite(ZAMEK_PIN, ZAMEK_CLOSED);
 
+  expander_2.pinMode(BUZZER_PIN, OUTPUT);
+  expander_2.pinMode(MOTOR_PIN_1, OUTPUT);
+  expander_2.pinMode(MOTOR_PIN_2, OUTPUT);
+  expander_2.pinMode(MOTOR_PIN_3, OUTPUT);
+  expander_2.pinMode(MOTOR_PIN_4, OUTPUT); 
+  expander_2.digitalWrite(BUZZER_PIN, ALARM_OFF);
+  motor.setSpeed(500);
+
+  change_rgb_color(RgbColor::Cyan);
+  
   // Lcd
   lcd.begin(16, 2);              // .
   lcd.backlight();               // . Załączenie podświetlenia.
@@ -115,7 +129,7 @@ void setup()
 
   // Inicjalizacja komunikacji po serial
   Serial.begin(9600);
-  //Serial.println("start");
+  Serial.println("start");
 
   SPI.begin();        // Initiate  SPI bus
   mfrc522.PCD_Init(); // Initiate MFRC522
@@ -282,8 +296,6 @@ void onEventsCallback(WebsocketsEvent event, String data) {
     }
 }
 
-
-
 /**
  * Funkcja wyświetlająca dwa napisy na wyświetlaczu
  * odpowiednio górny i dolny rząd
@@ -311,8 +323,8 @@ void display_on_lcd(char napis_top[16], char napis_bottom[16])
  */ 
 void change_rgb_color(const RgbColor &color)
 {
-  // HIGH is off
-  // LOW  is ON
+  // HIGH is ON
+  // LOW  is OFF
   int red = LOW,
       blue = LOW,
       green = LOW;
@@ -388,6 +400,10 @@ void reset_display() {
   change_and_display_lock_state(LockState::Closed);
 }
 
+void reset_lock() {
+  LOCK = CLOSED;
+}
+
 void handleRfid() {
   if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) return;
 
@@ -399,15 +415,26 @@ void handleRfid() {
   }
   content.toUpperCase();
 
-  if (content.substring(1) == "7B 71 17 21") handleLockOpen();
-  else if (content.substring(1) == "5B 05 49 0A") handleLockOpen();
+  if (content.substring(1) == "7B 71 17 21") 
+  { 
+    LOCK = OPEN_RFID; 
+    handleLockOpen();
+  }
+  else if (content.substring(1) == "5B 05 49 0A")
+  {  
+    LOCK = OPEN_RFID_2;     
+    handleLockOpen();  
+  }
   else if (content.substring(1) == "43 D3 44 7A") display_on_lcd("Oddawaj zarowke  ", "****************"); // Przypadek Wojciaszek
   else {} //change_and_display_lock_state(LockState::Closed);
 }
 
 void handleButton()
 {
-  if(expander_1.digitalRead(PRZYCISK_PIN) == HIGH) handleLockOpen() ;
+  if(expander_1.digitalRead(PRZYCISK_PIN) == HIGH) {
+    LOCK = OPEN_BUTTON;
+    handleLockOpen();
+  }
 }
 
 void handleKeyboard() {
@@ -448,10 +475,32 @@ void handleKeyPress(const char &key) {
   if (code_index == 3) {
     D("Zakończono wprowadzać kod");
     // Zakończono wprowadzać kod
+    if (!(strncmp(code_current, code_roleta_lock, 4))) {
+      if(ROLETA == UNLOCKED && (expander_1.digitalRead(CZUJNIK_DRZWI_PIN) == LOW) ) {
+      display_on_lcd("Drzwi zostaja  ","zablokowane.      ");
+      handleMotor(1);
+      ROLETA = LOCKED;
+      }
+    }
+    if (!(strncmp(code_current, code_roleta_unlock, 4))) {
+      if(ROLETA == LOCKED ) {
+      display_on_lcd("Drzwi zostaja  ","odblokowane.      ");
+      handleMotor(-1);
+      ROLETA = UNLOCKED;
+      }
+    }
     if (!(strncmp(code_current, code_open, 4))) {
-      D("Otwarcie");
-      handleLockOpen();
-    } else {
+      if(ROLETA == UNLOCKED )
+      {
+        D("Otwarcie");
+        LOCK = OPEN_CODE;
+        handleLockOpen();
+      }
+      else {display_on_lcd("Roleta uzyta","Odmowa dostepu");
+      closeLock();
+      }
+    } 
+    else {
       D("Blokada");
       change_and_display_lock_state(LockState::Blocked);
     }
@@ -487,25 +536,33 @@ void displayCode(const int &code_length) {
 }
 
 void handleLockOpen() {
-  if (LockCloseRequested && LockCloseCompleted) {
-    LockCloseCompleted = false;
-    LockCloseRequested = false;
-  }
-
-  if (LockCloseRequested) {
-    TimeoutData *timeoutData;
-
-    timeoutData = find_timeout(CLOSE_LOCK_TIMEOUT);
-    if(timeoutData != NULL) {
-      timeoutData->timeout = millis() + CLOSE_LOCK_TIMEOUT_TIME;
-      return;
+   if(ROLETA == UNLOCKED) { 
+    if (LockCloseRequested && LockCloseCompleted) {
+      LockCloseCompleted = false;
+      LockCloseRequested = false;
     }
-  }
 
-  D("Sending opening of lock state");
-  ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"opened\\\"}\"}");
-  D("Done sending opening of lock state");
-  openLock();
+    if (LockCloseRequested) {
+      TimeoutData *timeoutData;
+
+      timeoutData = find_timeout(CLOSE_LOCK_TIMEOUT);
+      if(timeoutData != NULL) {
+        timeoutData->timeout = millis() + CLOSE_LOCK_TIMEOUT_TIME;
+        return;
+      }
+    }
+
+    D("Sending opening of lock state");
+    ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"opened\\\"}\"}");
+    D("Done sending opening of lock state");
+    // TO_DO
+    // Wysyłanie sposobu otwarcia drzwi 
+    // D("Sending way of opening the lock");
+    // ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"opened\\\"}\"}");
+    // D("Done sending way of opening the lock");
+    openLock();
+   }
+   else {D("Drzwi zablokowane , kod nie działa");}  
 }
 
 void openLock() {
@@ -522,45 +579,47 @@ void closeLock() {
   D("Done sending closing of lock state");
   change_and_display_lock_state(LockState::Closed);
   LockCloseCompleted = true;
+  reset_lock();
 }
 
 void handleSettingAlarm() {
   if (AlarmRaiseRequested) refreshAlarm();
-
+  D("handleSettingAlarm");
   AlarmRaiseRequested = true;
   set_timeout(raiseAlarm, millis() + SET_ALARM_TIMEOUT_TIME, SET_ALARM_TIMEOUT);
 }
 
 void refreshAlarm() {
   TimeoutData *timeoutData;
-
+  D("refreshAlarm");
   timeoutData = find_timeout(SET_ALARM_TIMEOUT);
   timeoutData->timeout = millis() + SET_ALARM_TIMEOUT_TIME;
 }
 
 void handleCancelingAlarm() {
   if (!AlarmRaiseRequested) return;
-
+  D("handleCancelingAlarm");
   remove_timeout(SET_ALARM_TIMEOUT);
   AlarmRaiseRequested = false;
 }
 
 void raiseAlarm() {
+  D("raiseAlarm");
   AlarmRaiseRequested = false;
   AlarmRunning = true;
 
-  expander_1.digitalWrite(ALARM_PIN, ALARM_ON);
+  expander_2.digitalWrite(BUZZER_PIN, ALARM_ON);
   set_timeout(endAlarm, millis() + END_ALARM_TIMEOUT_TIME, END_ALARM_TIMEOUT);
 }
 
 void endAlarm() {
   AlarmRunning = false;
 
-  expander_1.digitalWrite(ALARM_PIN, ALARM_OFF);
+  expander_2.digitalWrite(BUZZER_PIN, ALARM_OFF);
 }
 
 void handleSensors() {
-  if (digitalRead(CZUJNIK_DRZWI_PIN)) {
+  if (expander_1.digitalRead(CZUJNIK_DRZWI_PIN) == HIGH) {
     // Otwarte
     if (lockState == LockState::Open) handleSettingAlarm();
   }
@@ -568,16 +627,28 @@ void handleSensors() {
     if (lockState == LockState::Closed) handleCancelingAlarm();
   }
 }
+void handleMotor(int dir){ //kierunek + rozwija - zwija
+ int  i = 0, T = 2;
+  for(i = 0; i<225; i++)
+  {
+    motor.step(dir*100);
+    yield();
+  }
+  expander_2.digitalWrite(MOTOR_PIN_4,LOW);   // Zerowanie silnika po wszystkich obrotach, żeby się nie grzał.
+  expander_2.digitalWrite(MOTOR_PIN_2,LOW);
+  expander_2.digitalWrite(MOTOR_PIN_3,LOW);
+  expander_2.digitalWrite(MOTOR_PIN_1,LOW);
+}
 
 void loop()
 {
   if (ws_client.available()) ws_client.poll();
-    //D("timeouts");
-  handle_timeouts();
+   // D("timeouts");
+   handle_timeouts();
     //D("rfid");
-  handleRfid();
+   handleRfid();
     //D("sensors");
-  //handleSensors();
+   handleSensors();
   
   for (int i = 0; i < KEYPAD_TRIES_NUMBER; i++) {
     delay(KEYPAD_TRIES_DELAY);
@@ -586,5 +657,7 @@ void loop()
       //D("Handling keyboard");
     }
     handleButton();
+    D(expander_1.digitalRead(CZUJNIK_DRZWI_PIN));
+   
   }
 }
