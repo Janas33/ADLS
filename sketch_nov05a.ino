@@ -7,52 +7,46 @@
 
 using namespace websockets;
 
-bool LockCloseRequested = false;
-bool LockCloseCompleted = false;
+  bool LockCloseRequested = false;
+  bool LockCloseCompleted = false;
 
-bool DisplayClearRequested = false;
+  bool DisplayClearRequested = false;
 
-bool AlarmRaiseRequested = false;
-bool AlarmRunning = false;
-
-
-
+  bool AlarmRaiseRequested = false;
+  bool AlarmRunning = false;
+//
 // Global variables
 #pragma region Globals
 
 // Stan drzwi
 LockState lockState = LockState::Closed;
-
 /*
  *   Inicjalizacja ekspander_1, na adresie EXPANDER_1_ADDR
  * Obsługuje:
  * Lock (zamek)
  * Diodę RGB
-*/
+ */
 PCF8574 expander_1(EXPANDER_1_ADDR);
 /*
  *   Inicjalizacja ekspander_2, na adresie EXPANDER_2_ADDR
  * Obsługuje:
  * Buzzer (alarm)
  * Silnik
-*/
+ */
 PCF8574 expander_2(EXPANDER_2_ADDR);
 
 Stepper motor(MOTOR_STEPS, MOTOR_PIN_4, MOTOR_PIN_2, MOTOR_PIN_3, MOTOR_PIN_1, &expander_2);
-
 /*
-*   Inicjalizacja wyświetlacza lcd, na adresie LIQUID_CRYSTAL_I2C_ADD
-*   z DISPLAY_LENGTH znakami na 2 rzędach
-*/
+ *   Inicjalizacja wyświetlacza lcd, na adresie LIQUID_CRYSTAL_I2C_ADD
+ *   z DISPLAY_LENGTH znakami na 2 rzędach
+ */
 LiquidCrystal_I2C lcd(LIQUID_CRYSTAL_I2C_ADDR, DISPLAY_LENGTH, DISPLAY_WIDTH);
-
 
 // Wifi
 const char *ssid = WIFI_SSID;         // WIFI network name
 const char *password = WIFI_PASSWORD; // WIFI network password
 uint8_t connection_state = 0;            // Connected to WIFI or not
 uint16_t reconnect_interval = WIFI_RECONNECT_INTERVAL;     // If not connected wait time to try again
-
 
 // Websockets
 const char* websockets_server = WEBSOCKETS_URL; //server adress and port
@@ -72,7 +66,6 @@ char keys[ROWS][COLS] = {
     {'7', '8', '9', 'C'},
     {'*', '0', '#', 'D'}
   };
-
 // Numery pinów na ekpanderze do którego podłączamy keypad
 byte rowPins[ROWS] = {0, 1, 2, 3}; // numery dla rzędów
 byte colPins[COLS] = {4, 5, 6, 7}; // numeryu dla kolumn
@@ -278,12 +271,13 @@ void sendPostToServer(String command) // Komuniacja z serverem przez WiFi.
 */
 #pragma endregion StareWifi
 
-// Funckcje do WebSocket
+/**
+ * Funckcje do WebSocket
+ */
 void onMessageCallback(WebsocketsMessage message) {
     Serial.print("Got Message: ");
     Serial.println(message.data());
 }
-
 void onEventsCallback(WebsocketsEvent event, String data) {
     if(event == WebsocketsEvent::ConnectionOpened) {
         Serial.println("Connnection Opened");
@@ -295,15 +289,13 @@ void onEventsCallback(WebsocketsEvent event, String data) {
         Serial.println("Got a Pong!");
     }
 }
-
 /**
  * Funkcja wyświetlająca dwa napisy na wyświetlaczu
  * odpowiednio górny i dolny rząd
  * @napis_top char[16] napis na górę
  * @napis_bot char[16] napis na dół
  */ 
-void display_on_lcd(char napis_top[16], char napis_bottom[16])
-{
+void display_on_lcd(char napis_top[16], char napis_bottom[16]) {
     // Jeżeli mamy timeout na reset stanu
     if (DisplayClearRequested) {
       remove_timeout(RESET_DISPLAY_TIMEOUT);
@@ -316,13 +308,11 @@ void display_on_lcd(char napis_top[16], char napis_bottom[16])
     lcd.setCursor(0, 1);
     lcd.print(napis_bottom);
 }
-
 /**
  * Funkcja zmieniająca kolor diody
  * @color: RgbColor docelowy kolor diody
  */ 
-void change_rgb_color(const RgbColor &color)
-{
+void change_rgb_color(const RgbColor &color) {
   // HIGH is ON
   // LOW  is OFF
   int red = LOW,
@@ -353,24 +343,22 @@ void change_rgb_color(const RgbColor &color)
   expander_1.digitalWrite(RGB_RED_PIN, red);
   expander_1.digitalWrite(RGB_BLUE_PIN, blue);
 }
-
 /**
  * Funkcja zmieniająca stan drzwi
  * @stan LockState docelowy stan drzwi
  */ 
-void change_and_display_lock_state(LockState stan)
-{
+void change_and_display_lock_state(LockState stan) {
   switch (stan)
   {
   case LockState::Open:
-    display_on_lcd("Drzwi otwarte   ", "****************");
+    display_on_lcd("Zamek otwarty   ", "****************");
     expander_1.digitalWrite(ZAMEK_PIN, ZAMEK_OPEN);
     change_rgb_color(RgbColor::Green);
     lockState = LockState::Open;
     break;
 
   case LockState::Closed:
-    display_on_lcd("Drzwi zamkniete ", "****************");
+    display_on_lcd("Zamek zamkniety ", "****************");
     expander_1.digitalWrite(ZAMEK_PIN, ZAMEK_CLOSED);
     change_rgb_color(RgbColor::Blue);
     lockState = LockState::Closed;
@@ -390,20 +378,28 @@ void change_and_display_lock_state(LockState stan)
     break;
   }
 }
-
+/**
+ * Funckja wywoływana przed resetem wyświatlacza.
+ */ 
 void delayed_reset_display() {
   DisplayClearRequested = false;
   reset_display();
 }
-
+/**
+ * Funkcja resetująca wyświetlacz.
+ */ 
 void reset_display() {
   change_and_display_lock_state(LockState::Closed);
 }
-
+/**
+ * Funkcja zerująca zmienną wysyłaną jako sposób otwarcia do strony internetowej.
+ */ 
 void reset_lock() {
   LOCK = CLOSED;
 }
-
+/**
+ * Funkcja odpowiedzialna za obsługę RFID oraz poszczególnych UID kart.
+ */ 
 void handleRfid() {
   if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) return;
 
@@ -428,15 +424,18 @@ void handleRfid() {
   else if (content.substring(1) == "43 D3 44 7A") display_on_lcd("Oddawaj zarowke  ", "****************"); // Przypadek Wojciaszek
   else {} //change_and_display_lock_state(LockState::Closed);
 }
-
-void handleButton()
-{
+/**
+ * Funckja odpowiedzialna za przycisk.
+ */ 
+void handleButton() {
   if(expander_1.digitalRead(PRZYCISK_PIN) == HIGH) {
     LOCK = OPEN_BUTTON;
     handleLockOpen();
   }
 }
-
+/**
+ * Funckja, która odczytuje nacisnięty przycisk na klawiaturze.
+ */ 
 void handleKeyboard() {
   char key = keypad.getKey();
   if(key) {
@@ -444,11 +443,12 @@ void handleKeyboard() {
     D(key);
   }
 }
-
-// Blokująca na chwilkę (KEYPAD_BEEP_TIME)
-void handleKeyPress(const char &key) {
+/**
+ * Funckja rozpoznająca funkcje przycisków oraz kody dostępu.
+ */ 
+void handleKeyPress(const char &key) { 
   expander_2.digitalWrite(BUZZER_PIN, ALARM_ON);
-  delay(KEYPAD_BEEP_TIME);
+  delay(KEYPAD_BEEP_TIME);                        // Blokująca na chwilkę (KEYPAD_BEEP_TIME)
   expander_2.digitalWrite(BUZZER_PIN, ALARM_OFF);
 
   if (key == REMOVE_BUTTON_CHAR) {
@@ -513,11 +513,15 @@ void handleKeyPress(const char &key) {
     displayCode(code_index);
   }
 }
-
+/**
+ * Funkcja zerująca odczytywany kod dostępu z klawiatury.
+ */ 
 void clearCode() {
   code_index = 0;
 }
-
+/**
+ * Funckja wyświetlająca na ekranie LCD postęp wpisywania kodów dostępu.
+ */ 
 void displayCode(const int &code_length) {
   String code_text = "Kod: ";
   char buf[DISPLAY_LENGTH];
@@ -534,7 +538,9 @@ void displayCode(const int &code_length) {
 
   display_on_lcd(buf, EMPTY_LCD_LINE);
 }
-
+/**
+ * Funkcja odpowiedzialna za procedurę otwarcia drzwi.
+ */ 
 void handleLockOpen() {
    if(ROLETA == UNLOCKED) { 
     if (LockCloseRequested && LockCloseCompleted) {
@@ -564,7 +570,9 @@ void handleLockOpen() {
    }
    else {D("Drzwi zablokowane , kod nie działa");}  
 }
-
+/**
+ * Funckja otwierająca zamek.
+ */ 
 void openLock() {
   change_and_display_lock_state(LockState::Open);
 
@@ -572,7 +580,9 @@ void openLock() {
   
   set_timeout(closeLock, millis() + CLOSE_LOCK_TIMEOUT_TIME, CLOSE_LOCK_TIMEOUT);
 }
-
+/**
+ * Funkcja zamykająca zamek.
+ */ 
 void closeLock() {
   D("Sending closing of lock state");
   ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"closed\\\"}\"}");
@@ -581,28 +591,36 @@ void closeLock() {
   LockCloseCompleted = true;
   reset_lock();
 }
-
+/**
+ * Funkcja rozpoczynająca procedurę alarmową.
+ */ 
 void handleSettingAlarm() {
   if (AlarmRaiseRequested) refreshAlarm();
   D("handleSettingAlarm");
   AlarmRaiseRequested = true;
   set_timeout(raiseAlarm, millis() + SET_ALARM_TIMEOUT_TIME, SET_ALARM_TIMEOUT);
 }
-
+/**
+ * Funkcja ustawiająca timeouty alarmu.
+ */ 
 void refreshAlarm() {
   TimeoutData *timeoutData;
   D("refreshAlarm");
   timeoutData = find_timeout(SET_ALARM_TIMEOUT);
   timeoutData->timeout = millis() + SET_ALARM_TIMEOUT_TIME;
 }
-
+/**
+ * Funkcja zdejmująca timeouty, gdy alarm ma nie zostać wywołany.
+ */ 
 void handleCancelingAlarm() {
   if (!AlarmRaiseRequested) return;
   D("handleCancelingAlarm");
   remove_timeout(SET_ALARM_TIMEOUT);
   AlarmRaiseRequested = false;
 }
-
+/**
+ * Funckja włączająca buzzer.
+ */ 
 void raiseAlarm() {
   D("raiseAlarm");
   AlarmRaiseRequested = false;
@@ -611,24 +629,42 @@ void raiseAlarm() {
   expander_2.digitalWrite(BUZZER_PIN, ALARM_ON);
   set_timeout(endAlarm, millis() + END_ALARM_TIMEOUT_TIME, END_ALARM_TIMEOUT);
 }
-
+/**
+ * Funkcja wyłączająca buzzer.
+ */ 
 void endAlarm() {
   AlarmRunning = false;
 
   expander_2.digitalWrite(BUZZER_PIN, ALARM_OFF);
 }
-
+/**
+ * Funkcja odpowiedzialna za informowanie o stanie drzwi i rozpoczynająca procedury alarmowe.
+ */ 
 void handleSensors() {
-  if (expander_1.digitalRead(CZUJNIK_DRZWI_PIN) == HIGH) {
+  if (expander_1.digitalRead(CZUJNIK_DRZWI_PIN) == LOW) {
     // Otwarte
-    if (lockState == LockState::Open) handleSettingAlarm();
+    if (lockState == LockState::Open) {
+      lcd.setCursor(0, 1);
+      lcd.print("Drzwi otwarte");
+      handleSettingAlarm();
+    }
   }
   else {
-    if (lockState == LockState::Closed) handleCancelingAlarm();
+    if (lockState == LockState::Closed){
+      lcd.setCursor(0, 1);
+      lcd.print("Drzwi zamkniete");
+      handleCancelingAlarm();
+    }
   }
 }
-void handleMotor(int dir){ //kierunek + rozwija - zwija
- int  i = 0, T = 2;
+/**
+ * Funkcja odpowiedzialna za sterowanie silnikiem
+ * @int dir odpowiada za kierunek 
+ * gdy +1 to rozwija rolete
+ * gdy -1 to zwija rolete
+ */ 
+void handleMotor(int dir){ 
+  int  i = 0, T = 2;
   for(i = 0; i<225; i++)
   {
     motor.step(dir*100);
@@ -648,7 +684,7 @@ void loop()
     //D("rfid");
    handleRfid();
     //D("sensors");
-   handleSensors();
+  // handleSensors();
   
   for (int i = 0; i < KEYPAD_TRIES_NUMBER; i++) {
     delay(KEYPAD_TRIES_DELAY);
@@ -657,7 +693,6 @@ void loop()
       //D("Handling keyboard");
     }
     handleButton();
-    D(expander_1.digitalRead(CZUJNIK_DRZWI_PIN));
-   
+    
   }
 }

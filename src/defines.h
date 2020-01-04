@@ -47,14 +47,14 @@
 
 // Piny
 #define RFID_SS_PIN        15       // Przypisanie SS_PIN z RFID do wejścia D8.
-#define RFID_RST_PIN        2       // Przypisanie RST_PIN z RFID do wejścia D4.
+#define RFID_RST_PIN        2       // Przypisanie RST_PIN z RFID do wejścia D4.  
 
 #define ZAMEK_PIN           0       // Pin na ekspanderze_1 na którym jest zamek.
 #define RGB_RED_PIN         1       // Pin na ekspanderze_1 na którym jest dioda.
 #define RGB_BLUE_PIN        2       // Pin na ekspanderze_1 na którym jest dioda.
 #define RGB_GREEN_PIN       4       // Pin na ekspanderze_1 na którym jest dioda.
 #define PRZYCISK_PIN        5       // Pin na ekspanderze_1 na którym jest przycisk.
-#define CZUJNIK_DRZWI_PIN   6      // Pin na ekspanderze_1 na którym jest czujnik.
+#define CZUJNIK_DRZWI_PIN   6       // Pin na ekspanderze_1 na którym jest czujnik. 
 
 #define MOTOR_STEPS        32       // Ilość kroków silnika krokowego.
 #define MOTOR_PIN_1         0       // Pin na ekspanderze_2 na którym jest silnik.
