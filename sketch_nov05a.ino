@@ -75,6 +75,11 @@ byte colPins[COLS] = {4, 5, 6, 7}; // numeryu dla kolumn
  */
 Keypad_I2C keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS, KEYPAD_I2C_ADDR);
 
+String convertToString(char* a, int size) { 
+ String s(a); 
+ return s; 
+} 
+
 // Code variables
 int code_index = 0;
 char code_current[4];
@@ -271,6 +276,38 @@ void sendPostToServer(String command) // Komuniacja z serverem przez WiFi.
 */
 #pragma endregion StareWifi
 
+/**
+ * Funkcja wysyłająca powiadomiana na maila.
+ * Jako argument przyjmuje 
+ * @adress jako adres mail, pod który ma wysłać maila
+ * @message jako wiadomość, którą wysyła
+ * def - domyślna wartość dla obu argumentów
+ */
+void send_mail(char* adress, char* message){
+Gsender *gsender = Gsender::Instance(); // Getting pointer to class instance
+  String subject = "ADLS Alarm";
+   int a_size = sizeof(adress) / sizeof(char); 
+   int m_size = sizeof(message) / sizeof(char); 
+  
+  const String string_adress = convertToString(adress, a_size); 
+  const String string_message = convertToString(message, m_size); 
+  
+  if(adress == "def" && message == "def"){
+   if (gsender->Subject(subject)->Send ("szymonruta.sr@gmail.com", "Door are open for a long period of time. Possible security breach")) {
+      Serial.println("Wysłano wiadomość domyślną.");
+   }
+  }
+
+  if (gsender->Subject(subject)->Send( string_adress,string_message ))
+  {
+    Serial.println("Message send.");
+  }
+  else
+  {
+    Serial.print("Error sending message: ");
+    Serial.println(gsender->getError());
+  }
+} 
 /**
  * Funckcje do WebSocket
  */
@@ -563,12 +600,29 @@ void handleLockOpen() {
     D("Done sending opening of lock state");
     // TO_DO
     // Wysyłanie sposobu otwarcia drzwi 
-    // D("Sending way of opening the lock");
-    // ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"opened\\\"}\"}");
-    // D("Done sending way of opening the lock");
+    D("Sending way of opening the lock");
+    signal_door_opening(LOCK);
+    D("Done sending way of opening the lock");
     openLock();
    }
    else {D("Drzwi zablokowane , kod nie działa");}  
+}
+/**
+ * Funckja odpowiedzialna za wysyłanie komunikatu o sposobie otwarcia drzwi.
+ */ 
+void signal_door_opening(int HOW) {
+  if(HOW == OPEN_RFID){
+    ws_client.send("{\"event\":{\"message\":\"Door were opened by RFID_1\",\"level\":\"alarm\",\"lock_token\":\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\"}}");
+  }
+  if(HOW == OPEN_RFID_2){
+    ws_client.send("{\"event\":{\"message\":\"Door were opened by RFID_2\",\"level\":\"alarm\",\"lock_token\":\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\"}}");
+  }
+  if(HOW == OPEN_CODE){
+    ws_client.send("{\"event\":{\"message\":\"Door were opened by CODE\",\"level\":\"alarm\",\"lock_token\":\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\"}}");
+  }
+  if(HOW == OPEN_BUTTON){
+    ws_client.send("{\"event\":{\"message\":\"Door were opened by BUTTON\",\"level\":\"alarm\",\"lock_token\":\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\"}}");
+  }
 }
 /**
  * Funckja otwierająca zamek.
