@@ -36,14 +36,16 @@
 
 
 // Wifi
- #define WIFI_SSID                 "Janas"                    // WIFI network name
- #define WIFI_PASSWORD             "wojciaszek3213"           // WIFI network password
-//#define WIFI_SSID                "Woz_obserwacyjny_342-R2"  // WIFI network name
-//#define WIFI_PASSWORD            "Wojteklubi07"             // WIFI network password
+// #define WIFI_SSID                 "Janas"                    // WIFI network name
+// #define WIFI_PASSWORD             "wojciaszek3213"           // WIFI network password
+#define WIFI_SSID                "Woz_obserwacyjny_342-R2"  // WIFI network name
+#define WIFI_PASSWORD            "Wojteklubi07"             // WIFI network password
 #define WIFI_RECONNECT_INTERVAL    10000                      // If not connected wait time to try again
 
 // WebSockets
-#define WEBSOCKETS_URL "ws://192.168.1.11:3000/api/cable"
+#define WEBSOCKETS_URL "ws://198.11.1.21.1/api/cable"
+//#define WEBSOCKETS_URL "ws://adls.herokuapp.com/api/cable"
+
 
 // Piny
 #define RFID_SS_PIN        15       // Przypisanie SS_PIN z RFID do wejścia D8.
@@ -67,6 +69,7 @@
 #define CLOSED              0
 #define OPEN_RFID          10
 #define OPEN_RFID_2        11
+#define OPEN_RFID_NEW      12
 #define OPEN_CODE          20
 #define OPEN_BUTTON        30
 

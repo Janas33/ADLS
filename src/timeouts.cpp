@@ -26,8 +26,10 @@ void handle_timeouts() {
 
 void remove_timeout(const char *name) {
   for (int i = 0; i < timeout_registry.size(); i++) {
-    if (strcmp(timeout_registry[i].name, name))
+      timeout_registry[i];
+      Serial.println("Weszlo do remove timeout");
 			timeout_registry.erase(timeout_registry.begin() + i);
+      timeout_registry.clear();
   }
 }
 

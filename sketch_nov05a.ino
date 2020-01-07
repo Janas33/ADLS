@@ -33,7 +33,7 @@ PCF8574 expander_1(EXPANDER_1_ADDR);
  * Buzzer (alarm)
  * Silnik
  */
-PCF8574 expander_2(EXPANDER_2_ADDR);
+PCF8574 expander_2(EXPANDER_2_ADDR,CZUJNIK_DRZWI_PIN,handleSensors);
 
 Stepper motor(MOTOR_STEPS, MOTOR_PIN_4, MOTOR_PIN_2, MOTOR_PIN_3, MOTOR_PIN_1, &expander_2);
 /*
@@ -86,9 +86,22 @@ char code_current[4];
 char code_open[] = "1234";
 char code_roleta_lock[] ="7809";
 char code_roleta_unlock[] ="AB63";
+char code_add_rfid[] = "9999";
 
 int ROLETA = UNLOCKED ; 
 int LOCK = CLOSED;
+
+String new_rfid_uid_1  = "00 00 00 00";
+String new_rfid_uid_2  = "00 00 00 00";
+String new_rfid_uid_3  = "00 00 00 00";
+
+//Buzzer timer variables
+int time_On = 50;
+int time_Off = 200;
+int timer;
+bool start;
+unsigned long prevMillis = 0;
+
 #pragma endregion Globals
 
 void setup()
@@ -154,6 +167,7 @@ void setup()
   ws_client.send("{\"command\":\"subscribe\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\"}");
   // Send a ping
   ws_client.ping();
+  ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"shutter_opened\\\"}\"}");
 
   change_rgb_color(RgbColor::Blue);
 }
@@ -284,20 +298,13 @@ void sendPostToServer(String command) // Komuniacja z serverem przez WiFi.
  * def - domyślna wartość dla obu argumentów
  */
 void send_mail(char* adress, char* message){
-Gsender *gsender = Gsender::Instance(); // Getting pointer to class instance
+  Gsender *gsender = Gsender::Instance(); // Getting pointer to class instance
   String subject = "ADLS Alarm";
    int a_size = sizeof(adress) / sizeof(char); 
    int m_size = sizeof(message) / sizeof(char); 
   
   const String string_adress = convertToString(adress, a_size); 
   const String string_message = convertToString(message, m_size); 
-  
-  if(adress == "def" && message == "def"){
-   if (gsender->Subject(subject)->Send ("szymonruta.sr@gmail.com", "Door are open for a long period of time. Possible security breach")) {
-      Serial.println("Wysłano wiadomość domyślną.");
-   }
-  }
-
   if (gsender->Subject(subject)->Send( string_adress,string_message ))
   {
     Serial.println("Message send.");
@@ -399,6 +406,10 @@ void change_and_display_lock_state(LockState stan) {
     expander_1.digitalWrite(ZAMEK_PIN, ZAMEK_CLOSED);
     change_rgb_color(RgbColor::Blue);
     lockState = LockState::Closed;
+    if (expander_1.digitalRead(CZUJNIK_DRZWI_PIN) == LOW) {
+      lcd.setCursor(0, 1);
+      lcd.print("Drzwi otwarte   ");
+    }
     break;
 
   case LockState::Blocked:
@@ -458,8 +469,68 @@ void handleRfid() {
     LOCK = OPEN_RFID_2;     
     handleLockOpen();  
   }
+  else if (content.substring(1) == new_rfid_uid_1 || content.substring(1) == new_rfid_uid_2 || content.substring(1) == new_rfid_uid_3)
+  {
+    LOCK = OPEN_RFID_NEW;
+    handleLockOpen();
+  }
   else if (content.substring(1) == "43 D3 44 7A") display_on_lcd("Oddawaj zarowke  ", "****************"); // Przypadek Wojciaszek
-  else {} //change_and_display_lock_state(LockState::Closed);
+  else if (content.substring(1)) { 
+    display_on_lcd("Brak dostepu    ","****************");
+    delay(500);
+    closeLock();
+  //   //change_and_display_lock_state(LockState::Closed);
+  }
+}
+/**
+ * Funkcja pozwalająca na dodanie nowej karty RFID.
+ */ 
+void new_rfid(){
+  if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) return;
+
+  String content = "";
+  for (byte i = 0; i < mfrc522.uid.size; i++)
+  {
+    content.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
+    content.concat(String(mfrc522.uid.uidByte[i], HEX));
+  }
+  content.toUpperCase();
+  if ((content.substring(1) == "7B 71 17 21") || content.substring(1) == new_rfid_uid_1 || content.substring(1) == new_rfid_uid_2 || content.substring(1) == new_rfid_uid_3 || (content.substring(1) == "5B 05 49 0A")) {
+    D("Ta karta już jest dodana, wprowadz kod jeszcze raz");
+    display_on_lcd("Ta karta jest   ","juz w systemie  ");
+    delay (1000);
+    display_on_lcd("Wpisz kod aby   ", "ponowic probe   ");
+    delay (1000);
+    closeLock(); 
+    
+  }
+  else{
+    if(new_rfid_uid_1 == "00 00 00 00") {
+      new_rfid_uid_1 = content.substring(1);
+      display_on_lcd("Dodano nowa     ","karte pomyslnie ");
+      //ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"opened\\\"}\"}");
+
+      delay(1000);
+    }
+    else{
+      if(new_rfid_uid_2 == "00 00 00 00") {
+       new_rfid_uid_2 = content.substring(1);
+       display_on_lcd("Dodano nowa     ","karte pomyslnie ");
+      //ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"opened\\\"}\"}");
+
+       delay (1000);
+      }
+      else{
+        if(new_rfid_uid_3 == "00 00 00 00") {
+          new_rfid_uid_3 = content.substring(1);
+          display_on_lcd("Dodano nowa     ","karte pomyslnie ");
+          //ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"opened\\\"}\"}");  
+          delay (1000);
+        }
+      }
+    }
+  }
+
 }
 /**
  * Funckja odpowiedzialna za przycisk.
@@ -468,6 +539,7 @@ void handleButton() {
   if(expander_1.digitalRead(PRZYCISK_PIN) == HIGH) {
     LOCK = OPEN_BUTTON;
     handleLockOpen();
+    D(expander_1.digitalRead(CZUJNIK_DRZWI_PIN));         // do testów
   }
 }
 /**
@@ -513,19 +585,35 @@ void handleKeyPress(const char &key) {
     D("Zakończono wprowadzać kod");
     // Zakończono wprowadzać kod
     if (!(strncmp(code_current, code_roleta_lock, 4))) {
-      if(ROLETA == UNLOCKED && (expander_1.digitalRead(CZUJNIK_DRZWI_PIN) == LOW) ) {
-      display_on_lcd("Drzwi zostaja  ","zablokowane.      ");
+      if(ROLETA == UNLOCKED && (expander_1.digitalRead(CZUJNIK_DRZWI_PIN) == HIGH) ) {
+      display_on_lcd("Drzwi zostaja   ","zablokowane.    ");
       handleMotor(1);
       ROLETA = LOCKED;
+      ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"shutter_closed\\\"}\"}");
+
       }
     }
     if (!(strncmp(code_current, code_roleta_unlock, 4))) {
       if(ROLETA == LOCKED ) {
-      display_on_lcd("Drzwi zostaja  ","odblokowane.      ");
+      display_on_lcd("Drzwi zostaja   ","odblokowane.    ");
       handleMotor(-1);
       ROLETA = UNLOCKED;
+      ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"shutter_opened\\\"}\"}");
+
       }
     }
+   if (!(strncmp(code_current, code_add_rfid, 4))) {
+      if(ROLETA == UNLOCKED )
+      {
+        D("Wprowadzono kod pozwalający na dodanie nowego RFID");
+        display_on_lcd("Mozna dodac nowa","karte RFID      ");
+        delay(2000);
+        new_rfid();
+      }
+      else {display_on_lcd("Roleta uzyta    ","Odmowa dostepu  ");
+        closeLock();
+      }
+    }  
     if (!(strncmp(code_current, code_open, 4))) {
       if(ROLETA == UNLOCKED )
       {
@@ -533,7 +621,7 @@ void handleKeyPress(const char &key) {
         LOCK = OPEN_CODE;
         handleLockOpen();
       }
-      else {display_on_lcd("Roleta uzyta","Odmowa dostepu");
+      else {display_on_lcd("Roleta uzyta    ","Odmowa dostepu  ");
       closeLock();
       }
     } 
@@ -556,6 +644,16 @@ void handleKeyPress(const char &key) {
 void clearCode() {
   code_index = 0;
 }
+/**
+ * Funkcja obsługująca kody jednorazowe.
+ */
+void one_time_code(){
+  int used; //dać wyżej
+  if(used == 0 ){
+  char code_n[] ="";
+  }
+
+} 
 /**
  * Funckja wyświetlająca na ekranie LCD postęp wpisywania kodów dostępu.
  */ 
@@ -617,6 +715,9 @@ void signal_door_opening(int HOW) {
   if(HOW == OPEN_RFID_2){
     ws_client.send("{\"event\":{\"message\":\"Door were opened by RFID_2\",\"level\":\"alarm\",\"lock_token\":\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\"}}");
   }
+  if(HOW == OPEN_RFID_NEW){
+    ws_client.send("{\"event\":{\"message\":\"Door were opened by RFID_NEW\",\"level\":\"alarm\",\"lock_token\":\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\"}}");
+  }
   if(HOW == OPEN_CODE){
     ws_client.send("{\"event\":{\"message\":\"Door were opened by CODE\",\"level\":\"alarm\",\"lock_token\":\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\"}}");
   }
@@ -650,9 +751,11 @@ void closeLock() {
  */ 
 void handleSettingAlarm() {
   if (AlarmRaiseRequested) refreshAlarm();
-  D("handleSettingAlarm");
-  AlarmRaiseRequested = true;
-  set_timeout(raiseAlarm, millis() + SET_ALARM_TIMEOUT_TIME, SET_ALARM_TIMEOUT);
+  else{
+    D("handleSettingAlarm");
+    AlarmRaiseRequested = true;
+    set_timeout(raiseAlarm, millis() + SET_ALARM_TIMEOUT_TIME, SET_ALARM_TIMEOUT);
+  }
 }
 /**
  * Funkcja ustawiająca timeouty alarmu.
@@ -667,10 +770,18 @@ void refreshAlarm() {
  * Funkcja zdejmująca timeouty, gdy alarm ma nie zostać wywołany.
  */ 
 void handleCancelingAlarm() {
-  if (!AlarmRaiseRequested) return;
-  D("handleCancelingAlarm");
-  remove_timeout(SET_ALARM_TIMEOUT);
-  AlarmRaiseRequested = false;
+  if (!AlarmRaiseRequested && !AlarmRunning) return;
+  if(AlarmRunning){
+    remove_timeout(SET_ALARM_TIMEOUT);
+    AlarmRaiseRequested = false;
+    endAlarm();
+  }
+  if(AlarmRaiseRequested){
+    D("handleCancelingAlarm");
+    remove_timeout(SET_ALARM_TIMEOUT);
+    AlarmRaiseRequested = false;
+  }
+  
 }
 /**
  * Funckja włączająca buzzer.
@@ -679,18 +790,43 @@ void raiseAlarm() {
   D("raiseAlarm");
   AlarmRaiseRequested = false;
   AlarmRunning = true;
-
+  //start = true;
   expander_2.digitalWrite(BUZZER_PIN, ALARM_ON);
   set_timeout(endAlarm, millis() + END_ALARM_TIMEOUT_TIME, END_ALARM_TIMEOUT);
+  // Wysyłanie emaila zbyt długo trwa i  zakończenie alarmu nie działa prawidłowo.
+  // send_mail("kjanowski9@gmail.com","Door are open for a long period of time. Possible security breach");
 }
 /**
  * Funkcja wyłączająca buzzer.
  */ 
 void endAlarm() {
+  D("endAlarm");
   AlarmRunning = false;
-
+  //start = false;
   expander_2.digitalWrite(BUZZER_PIN, ALARM_OFF);
+
 }
+// alarm_beep
+  // /**
+  //  * Funckja opisująca sposób wycia alarmu .
+  //  * @int start = TRUE włącza pikanie alarmu
+  //  * FALSE wyłącza
+  //  */ 
+  // void alarm_beep( bool &start){
+  //   if(start == true) {
+  //    if (millis() - prevMillis >= timer) {
+  //     if (expander_2.digitalRead(BUZZER_PIN)==ALARM_OFF) {     
+  //       timer = time_Off;
+  //     } else {
+  //         timer = time_On;
+  //       }
+  //     expander_2.digitalWrite(BUZZER_PIN, !expander_2.digitalRead(BUZZER_PIN)); 
+  //    }
+  //    if(start == false){
+  //      D("KONIEC ALARMU");
+  //    }
+  //   }
+  // }
 /**
  * Funkcja odpowiedzialna za informowanie o stanie drzwi i rozpoczynająca procedury alarmowe.
  */ 
@@ -699,15 +835,19 @@ void handleSensors() {
     // Otwarte
     if (lockState == LockState::Open) {
       lcd.setCursor(0, 1);
-      lcd.print("Drzwi otwarte");
+      lcd.print("Drzwi otwarte   ");
       handleSettingAlarm();
+      ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"door_opened\\\"}\"}");
+
     }
   }
   else {
     if (lockState == LockState::Closed){
       lcd.setCursor(0, 1);
-      lcd.print("Drzwi zamkniete");
+      lcd.print("Drzwi zamkniete ");
       handleCancelingAlarm();
+      ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"door_closed\\\"}\"}");
+
     }
   }
 }
@@ -738,7 +878,8 @@ void loop()
     //D("rfid");
    handleRfid();
     //D("sensors");
-  // handleSensors();
+   handleSensors();
+   //alarm_beep(start);
   
   for (int i = 0; i < KEYPAD_TRIES_NUMBER; i++) {
     delay(KEYPAD_TRIES_DELAY);
