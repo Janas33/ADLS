@@ -80,6 +80,9 @@ String convertToString(char* a, int size) {
  return s; 
 } 
 
+String TOKEN = "3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9";
+
+
 // Code variables
 int code_index = 0;
 char code_current[4];
@@ -87,9 +90,11 @@ char code_open[] = "1234";
 char code_roleta_lock[] ="7809";
 char code_roleta_unlock[] ="AB63";
 char code_add_rfid[] = "9999";
+char code_remove_rfid[] = "6666";
 
 int ROLETA = UNLOCKED ; 
 int LOCK = CLOSED;
+int bad_code = 0;
 
 String new_rfid_uid_1  = "00 00 00 00";
 String new_rfid_uid_2  = "00 00 00 00";
@@ -321,8 +326,8 @@ void send_mail(char* adress, char* message){
  * Funckcje do WebSocket
  */
 void onMessageCallback(WebsocketsMessage message) {
-    // Serial.print("Got Message: ");
-    // Serial.println(message.data());
+    Serial.print("Got Message: ");
+    Serial.println(message.data());
 }
 void onEventsCallback(WebsocketsEvent event, String data) {
     if(event == WebsocketsEvent::ConnectionOpened) {
@@ -466,11 +471,11 @@ void handleRfid() {
     LOCK = OPEN_RFID; 
     handleLockOpen();
   }
-  else if (content.substring(1) == "5B 05 49 0A")
-  {  
-    LOCK = OPEN_RFID_2;     
-    handleLockOpen();  
-  }
+  // else if (content.substring(1) == "5B 05 49 0A")
+  // {  
+  //   LOCK = OPEN_RFID_2;     
+  //   handleLockOpen();  
+  // }
   else if (content.substring(1) == new_rfid_uid_1 || content.substring(1) == new_rfid_uid_2 || content.substring(1) == new_rfid_uid_3)
   {
     LOCK = OPEN_RFID_NEW;
@@ -485,9 +490,15 @@ void handleRfid() {
   }
 }
 /**
- * Funkcja pozwalająca na dodanie nowej karty RFID.
+ * Funkcja wysyłająca do serwerwera kody dostępu i UID RFID.
  */ 
-void new_rfid(){
+void send_ws(String action, String attr, String attr_value){
+  ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\""+ TOKEN +"\\\", \\\""+ attr +"\\\":\\\""+ attr_value +"\\\",\\\"action\\\":\\\""+ action +"\\\"}\"}");
+}
+/**
+ * Funkcja pozwalająca na usuniecie karty RFID.
+ */ 
+void new_rfid_remove(){
   if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) return;
 
   String content = "";
@@ -497,35 +508,84 @@ void new_rfid(){
     content.concat(String(mfrc522.uid.uidByte[i], HEX));
   }
   content.toUpperCase();
-  if ((content.substring(1) == "7B 71 17 21") || content.substring(1) == new_rfid_uid_1 || content.substring(1) == new_rfid_uid_2 || content.substring(1) == new_rfid_uid_3 || (content.substring(1) == "5B 05 49 0A")) {
+  if (content.substring(1) == "7B 71 17 21") {
+    D("Nie można usuąć karty administratora RFID z systemu");
+    display_on_lcd("Odmowa usuniecia  ","RFID adminina   ");
+    delay (1500);
+  }
+  else if(content.substring(1) == new_rfid_uid_1) {
+    D("Usuwanie karty RFID z systemu");
+    send_ws("rfid_tag_removed","uid",new_rfid_uid_1);
+    new_rfid_uid_1 = "00 00 00 00";
+    display_on_lcd("Usunieto karte  ","RFID z systemu  ");
+    ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"RFID Card was removed succesfully.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"warning\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
+    delay (1500);
+  }
+  else if(content.substring(1) == new_rfid_uid_2) {
+    D("Usuwanie karty RFID z systemu");
+    send_ws("rfid_tag_removed","uid",new_rfid_uid_2);
+    new_rfid_uid_2 = "00 00 00 00";
+    display_on_lcd("Usunieto karte  ","RFID z systemu  ");
+    ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"RFID Card was removed succesfully.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"warning\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
+    delay (1500);
+  }
+  else if(content.substring(1) == new_rfid_uid_3) {
+    D("Usuwanie karty RFID z systemu");
+    send_ws("rfid_tag_removed","uid",new_rfid_uid_3);
+    new_rfid_uid_3 = "00 00 00 00";
+    display_on_lcd("Usunieto karte  ","RFID z systemu  ");
+    ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"RFID Card was removed succesfully.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"warning\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
+    delay (1500);
+  }
+  else{
+    D("Nie usunieto karty z systemu, ponieważ jej tam nie było");
+    display_on_lcd ("Nie ma tej      ", "karty w systemie");
+    delay (1500);
+    display_on_lcd("Wpisz kod aby   ", "ponowic probe   ");
+    delay (1500);
+  }
+}
+/**
+ * Funkcja pozwalająca na dodanie nowej karty RFID.
+ */ 
+void new_rfid_add(){
+  if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) return;
+
+  String content = "";
+  for (byte i = 0; i < mfrc522.uid.size; i++)
+  {
+    content.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
+    content.concat(String(mfrc522.uid.uidByte[i], HEX));
+  }
+  content.toUpperCase();
+  if ((content.substring(1) == "7B 71 17 21") || content.substring(1) == new_rfid_uid_1 || content.substring(1) == new_rfid_uid_2 || content.substring(1) == new_rfid_uid_3 /*|| (content.substring(1) == "5B 05 49 0A")*/) {
     D("Ta karta już jest dodana, wprowadz kod jeszcze raz");
     display_on_lcd("Ta karta jest   ","juz w systemie  ");
     delay (1500);
     ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"There was unsuccesfull try to add new RFID Card.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"warning\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
     display_on_lcd("Wpisz kod aby   ", "ponowic probe   ");
-    delay (1500);
-    closeLock(); 
-    
+    delay (1500);  
   }
   else{
     if(new_rfid_uid_1 == "00 00 00 00") {
       new_rfid_uid_1 = content.substring(1);
+      send_ws("rfid_tag_added","uid",new_rfid_uid_1);  
       display_on_lcd("Dodano nowa     ","karte pomyslnie ");
       ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"New RFID Card was added succesfully.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"warning\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
-
       delay(1000);
     }
     else{
       if(new_rfid_uid_2 == "00 00 00 00") {
        new_rfid_uid_2 = content.substring(1);
+       send_ws("rfid_tag_added","uid",new_rfid_uid_2);
        display_on_lcd("Dodano nowa     ","karte pomyslnie ");
-      ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"New RFID Card was added succesfully.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"warning\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
-
+       ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"New RFID Card was added succesfully.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"warning\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
        delay (1000);
       }
       else{
         if(new_rfid_uid_3 == "00 00 00 00") {
           new_rfid_uid_3 = content.substring(1);
+          send_ws("rfid_tag_added","uid",new_rfid_uid_3);
           display_on_lcd("Dodano nowa     ","karte pomyslnie ");
           ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"New RFID Card was added succesfully.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"warning\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
           delay (1000);
@@ -588,6 +648,7 @@ void handleKeyPress(const char &key) {
     D("Zakończono wprowadzać kod");
     // Zakończono wprowadzać kod
     if (!(strncmp(code_current, code_roleta_lock, 4))) {
+      bad_code = 0;
       if(ROLETA == UNLOCKED && (expander_1.digitalRead(CZUJNIK_DRZWI_PIN) == HIGH) ) {
       display_on_lcd("Drzwi zostaja   ","zablokowane.    ");
       handleMotor(1);
@@ -597,6 +658,7 @@ void handleKeyPress(const char &key) {
       }
     }
     if (!(strncmp(code_current, code_roleta_unlock, 4))) {
+      bad_code = 0;
       if(ROLETA == LOCKED ) {
       display_on_lcd("Drzwi zostaja   ","odblokowane.    ");
       handleMotor(-1);
@@ -606,18 +668,33 @@ void handleKeyPress(const char &key) {
       }
     }
    if (!(strncmp(code_current, code_add_rfid, 4))) {
+      bad_code = 0;
       if(ROLETA == UNLOCKED )
       {
         D("Wprowadzono kod pozwalający na dodanie nowego RFID");
         display_on_lcd("Mozna dodac nowa","karte RFID      ");
         delay(2000);
-        new_rfid();
+        new_rfid_add();
       }
       else {display_on_lcd("Roleta uzyta    ","Odmowa dostepu  ");
-        closeLock();
+        reset_display();
+      }
+    }  
+    if (!(strncmp(code_current, code_remove_rfid, 4))) {
+      bad_code = 0;
+      if(ROLETA == UNLOCKED )
+      {
+        D("Wprowadzono kod pozwalający na usuniecie karty RFID");
+        display_on_lcd("Mozna usunac    ","karte RFID      ");
+        delay(2000);
+        new_rfid_remove();
+      }
+      else {display_on_lcd("Roleta uzyta    ","Odmowa dostepu  ");
+        reset_display();
       }
     }  
     if (!(strncmp(code_current, code_open, 4))) {
+      bad_code = 0;
       if(ROLETA == UNLOCKED )
       {
         D("Otwarcie");
@@ -625,11 +702,16 @@ void handleKeyPress(const char &key) {
         handleLockOpen();
       }
       else {display_on_lcd("Roleta uzyta    ","Odmowa dostepu  ");
-      closeLock();
+      reset_display();
       }
     } 
     else {
       D("Blokada");
+      bad_code ++;
+      if (bad_code == 3) {
+      ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"Bad code was implemented few times.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"warning\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
+
+      }
       change_and_display_lock_state(LockState::Blocked);
     }
 
@@ -791,13 +873,13 @@ void handleCancelingAlarm() {
  */ 
 void raiseAlarm() {
   D("raiseAlarm");
+  send_mail("kjanowski9@gmail.com","Door are open for a long period of time. Possible security breach");
   AlarmRaiseRequested = false;
   AlarmRunning = true;
   expander_2.digitalWrite(BUZZER_PIN, ALARM_ON);
   ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"Door are opened for a long period of time.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"alarm\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
   set_timeout(endAlarm, millis() + END_ALARM_TIMEOUT_TIME, END_ALARM_TIMEOUT);
   // Wysyłanie emaila zbyt długo trwa i  zakończenie alarmu nie działa prawidłowo.
-  // send_mail("kjanowski9@gmail.com","Door are open for a long period of time. Possible security breach");
 }
 /**
  * Funkcja wyłączająca buzzer.
@@ -809,27 +891,6 @@ void endAlarm() {
   ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"Alarm is over.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"alarm\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
 
 }
-// alarm_beep
-  // /**
-  //  * Funckja opisująca sposób wycia alarmu .
-  //  * @int start = TRUE włącza pikanie alarmu
-  //  * FALSE wyłącza
-  //  */ 
-  // void alarm_beep( bool &start){
-  //   if(start == true) {
-  //    if (millis() - prevMillis >= timer) {
-  //     if (expander_2.digitalRead(BUZZER_PIN)==ALARM_OFF) {     
-  //       timer = time_Off;
-  //     } else {
-  //         timer = time_On;
-  //       }
-  //     expander_2.digitalWrite(BUZZER_PIN, !expander_2.digitalRead(BUZZER_PIN)); 
-  //    }
-  //    if(start == false){
-  //      D("KONIEC ALARMU");
-  //    }
-  //   }
-  // }
 /**
  * Funkcja odpowiedzialna za informowanie o stanie drzwi i rozpoczynająca procedury alarmowe.
  */ 
@@ -882,9 +943,7 @@ void loop()
     //D("rfid");
    handleRfid();
     //D("sensors");
-   handleSensors();
-   //alarm_beep(start);
-  
+   handleSensors();  
   for (int i = 0; i < KEYPAD_TRIES_NUMBER; i++) {
     delay(KEYPAD_TRIES_DELAY);
     if (lockState == LockState::Closed) {

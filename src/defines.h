@@ -43,8 +43,8 @@
 #define WIFI_RECONNECT_INTERVAL    10000                      // If not connected wait time to try again
 
 // WebSockets
-#define WEBSOCKETS_URL "ws://adls.herokuapp.com/api/cable"
-
+//#define WEBSOCKETS_URL "ws://adls.herokuapp.com/api/cable"
+#define WEBSOCKETS_URL "ws://192.168.1.21:3000/api/cable"
 
 // Piny
 #define RFID_SS_PIN        15       // Przypisanie SS_PIN z RFID do wejścia D8.
