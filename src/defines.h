@@ -43,8 +43,7 @@
 #define WIFI_RECONNECT_INTERVAL    10000                      // If not connected wait time to try again
 
 // WebSockets
-#define WEBSOCKETS_URL "ws://198.11.1.21.1/api/cable"
-//#define WEBSOCKETS_URL "ws://adls.herokuapp.com/api/cable"
+#define WEBSOCKETS_URL "ws://adls.herokuapp.com/api/cable"
 
 
 // Piny

@@ -33,7 +33,7 @@ PCF8574 expander_1(EXPANDER_1_ADDR);
  * Buzzer (alarm)
  * Silnik
  */
-PCF8574 expander_2(EXPANDER_2_ADDR,CZUJNIK_DRZWI_PIN,handleSensors);
+PCF8574 expander_2(EXPANDER_2_ADDR);
 
 Stepper motor(MOTOR_STEPS, MOTOR_PIN_4, MOTOR_PIN_2, MOTOR_PIN_3, MOTOR_PIN_1, &expander_2);
 /*
@@ -99,8 +99,9 @@ String new_rfid_uid_3  = "00 00 00 00";
 int time_On = 50;
 int time_Off = 200;
 int timer;
-bool start;
 unsigned long prevMillis = 0;
+
+bool send_door ;
 
 #pragma endregion Globals
 
@@ -165,6 +166,7 @@ void setup()
 
   // Connect to channel
   ws_client.send("{\"command\":\"subscribe\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\"}");
+  ws_client.send("{\"command\":\"subscribe\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\"}");
   // Send a ping
   ws_client.ping();
   ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"shutter_opened\\\"}\"}");
@@ -319,8 +321,8 @@ void send_mail(char* adress, char* message){
  * Funckcje do WebSocket
  */
 void onMessageCallback(WebsocketsMessage message) {
-    Serial.print("Got Message: ");
-    Serial.println(message.data());
+    // Serial.print("Got Message: ");
+    // Serial.println(message.data());
 }
 void onEventsCallback(WebsocketsEvent event, String data) {
     if(event == WebsocketsEvent::ConnectionOpened) {
@@ -498,9 +500,10 @@ void new_rfid(){
   if ((content.substring(1) == "7B 71 17 21") || content.substring(1) == new_rfid_uid_1 || content.substring(1) == new_rfid_uid_2 || content.substring(1) == new_rfid_uid_3 || (content.substring(1) == "5B 05 49 0A")) {
     D("Ta karta już jest dodana, wprowadz kod jeszcze raz");
     display_on_lcd("Ta karta jest   ","juz w systemie  ");
-    delay (1000);
+    delay (1500);
+    ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"There was unsuccesfull try to add new RFID Card.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"warning\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
     display_on_lcd("Wpisz kod aby   ", "ponowic probe   ");
-    delay (1000);
+    delay (1500);
     closeLock(); 
     
   }
@@ -508,7 +511,7 @@ void new_rfid(){
     if(new_rfid_uid_1 == "00 00 00 00") {
       new_rfid_uid_1 = content.substring(1);
       display_on_lcd("Dodano nowa     ","karte pomyslnie ");
-      //ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"opened\\\"}\"}");
+      ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"New RFID Card was added succesfully.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"warning\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
 
       delay(1000);
     }
@@ -516,7 +519,7 @@ void new_rfid(){
       if(new_rfid_uid_2 == "00 00 00 00") {
        new_rfid_uid_2 = content.substring(1);
        display_on_lcd("Dodano nowa     ","karte pomyslnie ");
-      //ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"opened\\\"}\"}");
+      ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"New RFID Card was added succesfully.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"warning\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
 
        delay (1000);
       }
@@ -524,7 +527,7 @@ void new_rfid(){
         if(new_rfid_uid_3 == "00 00 00 00") {
           new_rfid_uid_3 = content.substring(1);
           display_on_lcd("Dodano nowa     ","karte pomyslnie ");
-          //ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"opened\\\"}\"}");  
+          ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"New RFID Card was added succesfully.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"warning\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
           delay (1000);
         }
       }
@@ -589,7 +592,7 @@ void handleKeyPress(const char &key) {
       display_on_lcd("Drzwi zostaja   ","zablokowane.    ");
       handleMotor(1);
       ROLETA = LOCKED;
-      ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"shutter_closed\\\"}\"}");
+      ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"Rolling shutter is pulled up.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"warning\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
 
       }
     }
@@ -598,7 +601,7 @@ void handleKeyPress(const char &key) {
       display_on_lcd("Drzwi zostaja   ","odblokowane.    ");
       handleMotor(-1);
       ROLETA = UNLOCKED;
-      ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"shutter_opened\\\"}\"}");
+      ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"Rolling shutter is pulled down.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"warning\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
 
       }
     }
@@ -710,19 +713,19 @@ void handleLockOpen() {
  */ 
 void signal_door_opening(int HOW) {
   if(HOW == OPEN_RFID){
-    ws_client.send("{\"event\":{\"message\":\"Door were opened by RFID_1\",\"level\":\"alarm\",\"lock_token\":\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\"}}");
+    ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"Door were opened by RFID_1\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"info\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
   }
   if(HOW == OPEN_RFID_2){
-    ws_client.send("{\"event\":{\"message\":\"Door were opened by RFID_2\",\"level\":\"alarm\",\"lock_token\":\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\"}}");
+    ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"Door were opened by RFID_2\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"info\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
   }
   if(HOW == OPEN_RFID_NEW){
-    ws_client.send("{\"event\":{\"message\":\"Door were opened by RFID_NEW\",\"level\":\"alarm\",\"lock_token\":\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\"}}");
+    ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"Door were opened by RFID_NEW\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"info\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
   }
   if(HOW == OPEN_CODE){
-    ws_client.send("{\"event\":{\"message\":\"Door were opened by CODE\",\"level\":\"alarm\",\"lock_token\":\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\"}}");
+    ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"Door were opened by CODE\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"info\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
   }
   if(HOW == OPEN_BUTTON){
-    ws_client.send("{\"event\":{\"message\":\"Door were opened by BUTTON\",\"level\":\"alarm\",\"lock_token\":\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\"}}");
+    ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"Door were opened by BUTTON\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"info\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
   }
 }
 /**
@@ -790,8 +793,8 @@ void raiseAlarm() {
   D("raiseAlarm");
   AlarmRaiseRequested = false;
   AlarmRunning = true;
-  //start = true;
   expander_2.digitalWrite(BUZZER_PIN, ALARM_ON);
+  ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"Door are opened for a long period of time.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"alarm\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
   set_timeout(endAlarm, millis() + END_ALARM_TIMEOUT_TIME, END_ALARM_TIMEOUT);
   // Wysyłanie emaila zbyt długo trwa i  zakończenie alarmu nie działa prawidłowo.
   // send_mail("kjanowski9@gmail.com","Door are open for a long period of time. Possible security breach");
@@ -802,8 +805,8 @@ void raiseAlarm() {
 void endAlarm() {
   D("endAlarm");
   AlarmRunning = false;
-  //start = false;
   expander_2.digitalWrite(BUZZER_PIN, ALARM_OFF);
+  ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"Alarm is over.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"alarm\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
 
 }
 // alarm_beep
@@ -831,23 +834,24 @@ void endAlarm() {
  * Funkcja odpowiedzialna za informowanie o stanie drzwi i rozpoczynająca procedury alarmowe.
  */ 
 void handleSensors() {
+  
   if (expander_1.digitalRead(CZUJNIK_DRZWI_PIN) == LOW) {
     // Otwarte
-    if (lockState == LockState::Open) {
+    if (lockState == LockState::Open && send_door == true) {
       lcd.setCursor(0, 1);
       lcd.print("Drzwi otwarte   ");
       handleSettingAlarm();
       ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"door_opened\\\"}\"}");
-
+      send_door = false;
     }
   }
   else {
-    if (lockState == LockState::Closed){
+    if (lockState == LockState::Closed &&  send_door == false){
       lcd.setCursor(0, 1);
       lcd.print("Drzwi zamkniete ");
       handleCancelingAlarm();
       ws_client.send("{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"LocksChannel\\\"}\",\"data\":\"{\\\"token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"action\\\":\\\"door_closed\\\"}\"}");
-
+      send_door = true;
     }
   }
 }
