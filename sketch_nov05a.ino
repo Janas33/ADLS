@@ -107,6 +107,9 @@ int timer;
 unsigned long prevMillis = 0;
 
 bool send_door ;
+StaticJsonBuffer<200> jsonBuffer;
+char json[200];
+String json2 ;
 
 #pragma endregion Globals
 
@@ -296,6 +299,27 @@ void sendPostToServer(String command) // Komuniacja z serverem przez WiFi.
 }
 */
 #pragma endregion StareWifi
+/*
+ * Funckja zamieniająca string na char.
+ */
+void string_to_char(String s,char* c) {  
+  strcpy(c, s.c_str());
+}
+// Wyciąganie z JSON String informacji TO_DO !!
+// void json_read() {
+//   JsonObject& root = jsonBuffer.parseObject(json);
+
+//   if(!root.success()) {
+//     Serial.println("parseObject() failed");
+//     return ;
+//   }
+//   long time_open = root["open_at"];
+//   long time_close = root["close_at"];
+//   Serial.println("Wyświetlanie godzin");
+//   Serial.println(time_open);
+//   Serial.println(time_close);
+//   Serial.println("Koniec wysyłania godzin");
+// }
 
 /**
  * Funkcja wysyłająca powiadomiana na maila.
@@ -328,6 +352,12 @@ void send_mail(char* adress, char* message){
 void onMessageCallback(WebsocketsMessage message) {
     Serial.print("Got Message: ");
     Serial.println(message.data());
+    json2 = message.data();
+    string_to_char(json2,json);
+    Serial.println("To przyszło");
+    Serial.println(json);
+    json2 = "0";
+  
 }
 void onEventsCallback(WebsocketsEvent event, String data) {
     if(event == WebsocketsEvent::ConnectionOpened) {
@@ -602,7 +632,7 @@ void handleButton() {
   if(expander_1.digitalRead(PRZYCISK_PIN) == HIGH) {
     LOCK = OPEN_BUTTON;
     handleLockOpen();
-    D(expander_1.digitalRead(CZUJNIK_DRZWI_PIN));         // do testów
+   //json_read();
   }
 }
 /**

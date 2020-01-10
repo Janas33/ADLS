@@ -17,4 +17,5 @@
 #include <MFRC522.h>           // Biblioteka do RFID.
 #include <Gsender.h>           // Biblioteka do wysyłania maila.
 #include <vector>
-#include <ArduinoWebsockets.h>
+#include <ArduinoWebsockets.h> // Biblioteka do komunikacji z serwerem za pomocą websocketów.
+#include <ArduinoJson.h>       // Biblioteka potrzebna do używania Jsona.
