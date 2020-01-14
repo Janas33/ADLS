@@ -218,7 +218,7 @@ void json_read(){
     JsonObject message_code = message["codes"][i];
     const char* message_code_kind = message_code["kind"]; // "standard"
     const char* message_code_code = message_code["code"]; // "1243"
-    Serial.print(" CODE");Serial.print(i);Serial.println(message_code_code);
+    Serial.print("CODE  #");Serial.println(i);Serial.println(message_code_code);
     if (String(message_code_kind) ==  String("standard")){
       json_codes_standard.push_back(String(message_code_code));
      }
@@ -231,7 +231,7 @@ void json_read(){
     JsonObject message_rfid_tags = message["rfid_tags"][i];
     const char* message_rfid_tags_uid = message_rfid_tags["uid"];
     json_rfid.push_back(String(message_rfid_tags_uid));
-    Serial.print("RFIT TAG");Serial.print(i);Serial.println(message_rfid_tags_uid);
+    Serial.print("RFIT TAG  #");Serial.println(i);Serial.println(message_rfid_tags_uid);
     yield();
   }
 }
@@ -598,15 +598,23 @@ void handleKeyPress(const char &key) {
     }  
     for (String str : json_codes_standard){ 
       if (String(code_current) ==  str) {
+        if(ROLETA == UNLOCKED ){
         bad_code = 0;
         HOW = OPEN_CODE;
         handleLockOpen();
         clearCode();
         return;
       }
+       else {display_on_lcd("Roleta uzyta    ","Odmowa dostepu  ");
+        delay(1500);
+        reset_display();
+        return;
+        }
+      }
     }
     for (int i = 0; i < json_codes_one_time.size(); i++) {
       if (String(code_current) ==  json_codes_one_time[i]) {
+        if(ROLETA == UNLOCKED ){
         bad_code = 0;
         HOW = OPEN_ONETIME_CODE;
         handleLockOpen();
@@ -614,6 +622,12 @@ void handleKeyPress(const char &key) {
         json_codes_one_time.erase(json_codes_one_time.begin() + i);
         clearCode();
         return;
+        }
+        else {display_on_lcd("Roleta uzyta    ","Odmowa dostepu  ");
+        delay(1500);
+        reset_display();
+        return;
+        }
       }
     }
 
@@ -626,6 +640,7 @@ void handleKeyPress(const char &key) {
         handleLockOpen();
       }
       else {display_on_lcd("Roleta uzyta    ","Odmowa dostepu  ");
+      delay(1500);
       reset_display();
       }
     } 
