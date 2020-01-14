@@ -15,7 +15,7 @@ void handle_timeouts() {
   for (int i = 0; i < timeout_registry.size(); i++) {
     timeoutData = &timeout_registry[i];
 
-    Serial.println("handle_timeouts pętla: " + String(timeoutData->name) + ", milis: " +  String(timeoutData->timeout) + ", curr: " + String(millis()) );
+   // Serial.println("handle_timeouts pętla: " + String(timeoutData->name) + ", milis: " +  String(timeoutData->timeout) + ", curr: " + String(millis()) );
     if (timeoutData->timeout < millis()) {
 			timeoutData->f();
 			timeout_registry.erase(timeout_registry.begin() + i);
@@ -27,7 +27,6 @@ void handle_timeouts() {
 void remove_timeout(const char *name) {
   for (int i = 0; i < timeout_registry.size(); i++) {
       timeout_registry[i];
-      Serial.println("Weszlo do remove timeout");
 			timeout_registry.erase(timeout_registry.begin() + i);
       timeout_registry.clear();
   }

@@ -43,8 +43,8 @@
 #define WIFI_RECONNECT_INTERVAL    10000                      // If not connected wait time to try again
 
 // WebSockets
-//#define WEBSOCKETS_URL "ws://adls.herokuapp.com/api/cable"
-#define WEBSOCKETS_URL "ws://192.168.1.21:3000/api/cable"
+#define WEBSOCKETS_URL "ws://adls.herokuapp.com/api/cable"
+//#define WEBSOCKETS_URL "ws://192.168.1.22:3000/api/cable"
 
 // Piny
 #define RFID_SS_PIN        15       // Przypisanie SS_PIN z RFID do wejścia D8.
@@ -55,7 +55,7 @@
 #define RGB_BLUE_PIN        2       // Pin na ekspanderze_1 na którym jest dioda.
 #define RGB_GREEN_PIN       4       // Pin na ekspanderze_1 na którym jest dioda.
 #define PRZYCISK_PIN        5       // Pin na ekspanderze_1 na którym jest przycisk.
-#define CZUJNIK_DRZWI_PIN   6       // Pin na ekspanderze_1 na którym jest czujnik. 
+#define CZUJNIK_DRZWI_PIN   6       // Pin na ekspanderze_1 na którym jest czujnik.  //ANALOG READ
 
 #define MOTOR_STEPS        32       // Ilość kroków silnika krokowego.
 #define MOTOR_PIN_1         0       // Pin na ekspanderze_2 na którym jest silnik.
@@ -66,11 +66,12 @@
 
 //Kody sygnalizujące otwarcie drzwi
 #define CLOSED              0
-#define OPEN_RFID          10
-#define OPEN_RFID_2        11
-#define OPEN_RFID_NEW      12
-#define OPEN_CODE          20
-#define OPEN_BUTTON        30
+#define OPEN_RFID          "Door were opened by RFID_1"
+#define OPEN_RFID_2        "Door were opened by RFID_2"
+#define OPEN_RFID_NEW      "Door were opened by RFID_NEW"
+#define OPEN_CODE          "Door were opened by CODE"
+#define OPEN_ONETIME_CODE  "Door were opened by CODE (ONETIME)"
+#define OPEN_BUTTON        "Door were opened by BUTTON"
 
 // Adresy
 #define KEYPAD_I2C_ADDR         0x20       // Adres KEYPAD

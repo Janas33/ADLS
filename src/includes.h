@@ -19,3 +19,4 @@
 #include <vector>
 #include <ArduinoWebsockets.h> // Biblioteka do komunikacji z serwerem za pomocą websocketów.
 #include <ArduinoJson.h>       // Biblioteka potrzebna do używania Jsona.
+#include <DS3231.h>            // Biblioteka do obsługi RTS Clock.
