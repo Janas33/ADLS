@@ -630,30 +630,16 @@ void handleKeyPress(const char &key) {
         }
       }
     }
-
-    if (!(strncmp(code_current, code_open, 4)), 4) {
-      bad_code = 0;
-      if(ROLETA == UNLOCKED )
-      {
-        D("Otwarcie");
-        HOW = OPEN_CODE;
-        handleLockOpen();
-      }
-      else {display_on_lcd("Roleta uzyta    ","Odmowa dostepu  ");
-      delay(1500);
-      reset_display();
-      }
-    } 
-    else {
       D("Blokada");
       bad_code ++;
       if (bad_code == 3) {
       ws_client.send(    "{\"command\":\"message\",\"identifier\":\"{\\\"channel\\\":\\\"EventsChannel\\\"}\",\"data\":\"{\\\"event\\\":{\\\"message\\\":\\\"Bad code was implemented few times.\\\",\\\"lock_token\\\":\\\"3173d8ef-ac1c-46ec-9d87-ecf63cdc13b9\\\",\\\"level\\\":\\\"warning\\\"},\\\"action\\\":\\\"event_occured\\\"}\"}") ;
       clearCode();
+      reset_display();
       return;
       }
       change_and_display_lock_state(LockState::Blocked);
-    }
+    
 
     clearCode();
   } else {
