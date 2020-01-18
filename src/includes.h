@@ -16,7 +16,7 @@
 #include <SPI.h>               // Biblioteka do komunikacji z jednym lub większą liczbą urządzeń peryferyjnych.
 #include <MFRC522.h>           // Biblioteka do RFID.
 #include <Gsender.h>           // Biblioteka do wysyłania maila.
-#include <vector>
+#include <vector>              // Biblioteka do tablic.
 #include <ArduinoWebsockets.h> // Biblioteka do komunikacji z serwerem za pomocą websocketów.
 #include <ArduinoJson.h>       // Biblioteka potrzebna do używania Jsona.
 #include <DS3231.h>            // Biblioteka do obsługi RTS Clock.

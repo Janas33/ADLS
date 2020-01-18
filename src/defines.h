@@ -36,10 +36,10 @@
 
 
 // Wifi
-// #define WIFI_SSID                 "Janas"                    // WIFI network name
-// #define WIFI_PASSWORD             "wojciaszek3213"           // WIFI network password
-#define WIFI_SSID                "Woz_obserwacyjny_342-R2"  // WIFI network name
-#define WIFI_PASSWORD            "Wojteklubi07"             // WIFI network password
+#define WIFI_SSID                 "Janas"                    // WIFI network name
+#define WIFI_PASSWORD             "wojciaszek3213"           // WIFI network password
+// #define WIFI_SSID                "Woz_obserwacyjny_342-R2"  // WIFI network name
+// #define WIFI_PASSWORD            "Wojteklubi07"             // WIFI network password
 #define WIFI_RECONNECT_INTERVAL    10000                      // If not connected wait time to try again
 
 // WebSockets

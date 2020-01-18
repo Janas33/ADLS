@@ -194,7 +194,8 @@ void string_to_char(String s,char* c) {
  * zawierającą kody, harmonogram rolety, numery kart RFID
  */
 void json_read(){
-  const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_ARRAY_SIZE(2) + JSON_OBJECT_SIZE(2) + 2*JSON_OBJECT_SIZE(4) + 2*JSON_OBJECT_SIZE(5) + JSON_OBJECT_SIZE(6) + JSON_OBJECT_SIZE(8) + 650;
+  const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_ARRAY_SIZE(2) + JSON_OBJECT_SIZE(2) + 2*JSON_OBJECT_SIZE(4) + 
+  2*JSON_OBJECT_SIZE(5) + JSON_OBJECT_SIZE(6) + JSON_OBJECT_SIZE(8) + 650;
   DynamicJsonDocument doc(capacity);
   yield();
   deserializeJson(doc, json);
@@ -777,7 +778,7 @@ void handleCancelingAlarm() {
  */ 
 void raiseAlarm() {
   D("raiseAlarm");
-  send_mail("	szymonruta.sr@gmail.com","Door are open for a long period of time. Possible security breach");
+  send_mail("kjanowski9@gmail.com","Door are open for a long period of time. Possible security breach");
   AlarmRaiseRequested = false;
   AlarmRunning = true;
   expander_2.digitalWrite(BUZZER_PIN, ALARM_ON);
@@ -857,7 +858,5 @@ void loop()
     }
     handleButton();
     CZUJNIK_DRZWI = analogRead(17);
-    
-    
   }
 }
